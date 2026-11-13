@@ -1,5 +1,5 @@
-from rlfeed.baselines import LinUCBPolicy, OracleGreedyPolicy, RandomPolicy
-from rlfeed.evaluate import run_policy
+from curio.baselines import LinUCBPolicy, OracleGreedyPolicy, RandomPolicy
+from curio.evaluate import run_policy
 
 
 def test_random_is_worse_than_oracle():

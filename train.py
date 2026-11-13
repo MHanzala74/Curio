@@ -13,10 +13,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from rlfeed.baselines import LinUCBPolicy, OracleGreedyPolicy, RandomPolicy
-from rlfeed.env import FeedEnv
-from rlfeed.evaluate import run_policy, run_ppo
-from rlfeed.ppo import PPO, ActorCritic
+from curio.baselines import LinUCBPolicy, OracleGreedyPolicy, RandomPolicy
+from curio.env import FeedEnv
+from curio.evaluate import run_policy, run_ppo
+from curio.ppo import PPO, ActorCritic
 
 
 def collect(env: FeedEnv, model: ActorCritic, episodes: int):

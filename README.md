@@ -1,4 +1,6 @@
-# curio-rl
+# Curio
+
+**An AI feed curator that learns your taste.**
 
 A multi-agent news feed curator that learns **your** taste using real
 reinforcement learning (PPO actor-critic), not just a bandit.

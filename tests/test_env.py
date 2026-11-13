@@ -1,6 +1,6 @@
 import numpy as np
 
-from rlfeed.env import FeedEnv
+from curio.env import FeedEnv
 
 
 def test_reset_shape():

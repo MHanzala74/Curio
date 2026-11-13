@@ -1,7 +1,7 @@
 import numpy as np
 
-from rlfeed.env import FeedEnv
-from rlfeed.ppo import PPO, ActorCritic
+from curio.env import FeedEnv
+from curio.ppo import PPO, ActorCritic
 
 
 def test_gae_matches_manual_computation():
