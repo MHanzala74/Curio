@@ -132,3 +132,39 @@ class OracleFatiguePolicy:
 
     def observe(self, *args, **kwargs) -> None:
         pass
+
+
+class FatigueAwareLinUCBPolicy(LinUCBPolicy):
+    """Per-user LinUCB plus a fatigue penalty on recently shown content.
+
+    The policy tracks its own exposure vector from the items it showed (it never
+    reads the hidden user state) and subtracts ``beta * max(0, exposure . item)``
+    from each score. ``beta`` and ``decay`` are hyperparameters tuned on
+    validation seeds. This is a fair, non-RL counterpart to PPO that has access
+    to the same fatigue information.
+    """
+
+    name = "linucb-fatigue-aware"
+
+    def __init__(self, dim: int, alpha: float = 2.0, reg: float = 0.3, beta: float = 2.0,
+                 decay: float = 0.97) -> None:
+        super().__init__(dim, alpha=alpha, reg=reg, reset_each_episode=True, signed_reward=True)
+        self.beta, self.decay = beta, decay
+        self.exposure = np.zeros(dim)
+
+    def start_episode(self) -> None:
+        super().start_episode()
+        self.exposure = np.zeros(self.dim)
+
+    def act(self, env, obs) -> int:
+        a_inv = np.linalg.inv(self.A)
+        theta = a_inv @ self.b
+        mean = env.pool @ theta
+        bonus = self.alpha * np.sqrt(np.einsum("ij,jk,ik->i", env.pool, a_inv, env.pool))
+        scores = mean + bonus - self.beta * np.maximum(0.0, env.pool @ self.exposure)
+        scores[~env.action_masks()] = -np.inf
+        return int(np.argmax(scores))
+
+    def observe(self, item: np.ndarray, clicked: bool) -> None:
+        super().observe(item, clicked)
+        self.exposure = self.decay * self.exposure + item

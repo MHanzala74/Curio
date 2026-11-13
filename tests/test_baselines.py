@@ -21,3 +21,19 @@ def test_oracle_diverse_beats_plain_oracle_when_novelty_matters():
     plain = run_policy(OracleGreedyPolicy(), 150, seed=4, **kw)
     diverse = run_policy(OracleDiversePolicy(), 150, seed=4, **kw)
     assert diverse["return"] > plain["return"]
+
+
+def test_fatigue_aware_policy_tracks_exposure_and_avoids_it():
+    import numpy as np
+
+    from curio.baselines import FatigueAwareLinUCBPolicy
+    from curio.env_longterm import LongTermFeedEnv
+
+    env = LongTermFeedEnv(seed=0)
+    env.reset()
+    policy = FatigueAwareLinUCBPolicy(8, alpha=0.0, beta=10.0, decay=0.97)
+    policy.start_episode()
+    policy.observe(env.pool[0].copy(), True)
+    assert np.linalg.norm(policy.exposure) > 0
+    choice = policy.act(env, None)
+    assert float(env.pool[choice] @ policy.exposure) <= 0.0

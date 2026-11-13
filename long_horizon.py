@@ -16,7 +16,8 @@ from pathlib import Path
 
 import numpy as np
 
-from curio.baselines import LinUCBPolicy, OracleFatiguePolicy, RandomPolicy
+from curio.baselines import (FatigueAwareLinUCBPolicy, LinUCBPolicy, OracleFatiguePolicy,
+                             RandomPolicy)
 from curio.env_longterm import LongTermFeedEnv
 from curio.evaluate import run_policy, run_ppo
 from curio.training import train_ppo
@@ -39,6 +40,21 @@ def tune_linucb() -> dict:
     return best[1]
 
 
+def tune_fatigue_linucb() -> dict:
+    """Tune the fatigue-aware bandit on validation seeds (never the eval seeds)."""
+    best = (-1.0, None)
+    for alpha, beta, decay in itertools.product([0.0, 0.25, 0.5], [6.0, 10.0, 16.0], [0.95, 0.97, 0.99]):
+        score = np.mean([
+            run_policy(FatigueAwareLinUCBPolicy(8, alpha=alpha, reg=0.3, beta=beta, decay=decay),
+                       150, 2000 + s, env_cls=LongTermFeedEnv)["return"]
+            for s in VAL_SEEDS
+        ])
+        if score > best[0]:
+            best = (float(score), dict(alpha=alpha, beta=beta, decay=decay))
+    print("tuned fatigue-aware LinUCB:", best, flush=True)
+    return best[1]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--variant", choices=["baselines", "ppo99", "ppo90"], required=True)
@@ -54,6 +70,7 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     kw = dict(env_cls=LongTermFeedEnv)
     lin_params = tune_linucb() if args.variant == "baselines" else None
+    fat_params = tune_fatigue_linucb() if args.variant == "baselines" else None
 
     for seed in args.seeds:
         eval_seed = 1000 + seed
@@ -63,10 +80,13 @@ def main() -> None:
                 "linucb (tuned)": run_policy(
                     LinUCBPolicy(8, signed_reward=True, reset_each_episode=True, **lin_params),
                     args.eval_episodes, eval_seed, **kw),
+                "linucb (fatigue-aware)": run_policy(
+                    FatigueAwareLinUCBPolicy(8, reg=0.3, **fat_params),
+                    args.eval_episodes, eval_seed, **kw),
                 "oracle-myopic": run_policy(OracleFatiguePolicy(0.0), args.eval_episodes, eval_seed, **kw),
                 "oracle-lookahead": run_policy(OracleFatiguePolicy(3.0), args.eval_episodes, eval_seed, **kw),
             }
-            payload = {"results": runs, "linucb_params": lin_params}
+            payload = {"results": runs, "linucb_params": lin_params, "fatigue_linucb_params": fat_params}
         else:
             gamma = 0.99 if args.variant == "ppo99" else 0.9
             model, history = train_ppo(seed, args.updates, args.episodes_per_update, log_every=50,
