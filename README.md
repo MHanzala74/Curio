@@ -34,8 +34,8 @@ sequential decision problem, which is exactly what RL is for.
 
 - [x] Project scaffold
 - [x] Gymnasium environment and simulated user
-- [ ] PPO implementation (PyTorch) and baselines (random, greedy, bandit)
-- [ ] Learning curves and ablation table
+- [x] PPO implementation (PyTorch) and baselines (random, greedy, bandit)
+- [x] Learning curves and first comparison table (single seed)
 - [ ] Real feedback pipeline
 - [ ] LLM agents (collector, summarizer, reflector)
 - [ ] GitHub Actions daily run
@@ -50,6 +50,36 @@ pip install -r requirements.txt
 ## License
 
 MIT
+
+## Results (simulated user)
+
+![Learning curve](docs/learning_curve.png)
+
+Evaluated on 300 fresh episodes with the same seed for every method:
+
+| Method | Mean episode return | Click-through rate |
+|---|---|---|
+| random | 3.535 | 0.461 |
+| linucb-bandit | 4.530 | 0.719 |
+| oracle-greedy | 4.565 | 0.729 |
+| ppo (ours) | 4.659 | 0.679 |
+
+Reproduce with:
+
+```bash
+PYTHONPATH=src python train.py --updates 120
+```
+
+**Honest notes**
+
+- This is a **single seed** and the gaps between PPO, LinUCB and the oracle are
+  small, so they are not statistically meaningful yet. Multi-seed runs with
+  confidence intervals are the next step.
+- PPO beating the bandit is mostly explained by the reward including a novelty
+  term, which a one-step bandit cannot optimize. The simulated user is simple,
+  so these numbers say little about performance on a real person.
+- The oracle-greedy policy peeks at the true user interest, so it is a
+  reference point, not a fair competitor.
 
 ## Running the tests
 
