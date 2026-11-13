@@ -15,35 +15,43 @@ from torch.distributions import Categorical
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, pool_size: int, dim: int, hidden: int = 64) -> None:
+    """Permutation-invariant actor-critic over a pool of candidate items.
+
+    Observation layout: ``[n_summaries vectors | n_scalars | pool | availability]``.
+    """
+
+    def __init__(self, pool_size: int, dim: int, hidden: int = 64,
+                 n_summaries: int = 4, n_scalars: int = 0) -> None:
         super().__init__()
         self.pool_size, self.dim = pool_size, dim
-        # Per-item features: 4 summaries (shown, clicked, skipped, belief), the item,
-        # item * each summary, and an availability flag.
+        self.n_summaries, self.n_scalars = n_summaries, n_scalars
+        # Per-item features: summaries, the item, item * each summary, scalars,
+        # and an availability flag.
         self.scorer = nn.Sequential(
-            nn.Linear(9 * dim + 1, hidden), nn.Tanh(),
+            nn.Linear((2 * n_summaries + 1) * dim + n_scalars + 1, hidden), nn.Tanh(),
             nn.Linear(hidden, hidden), nn.Tanh(),
             nn.Linear(hidden, 1),
         )
         self.critic = nn.Sequential(
-            nn.Linear(5 * dim + 1, hidden), nn.Tanh(),
+            nn.Linear((n_summaries + 1) * dim + n_scalars + 1, hidden), nn.Tanh(),
             nn.Linear(hidden, 1),
         )
 
     def _split(self, obs: torch.Tensor):
-        b, d = obs.shape[0], self.dim
-        summaries = obs[:, : 4 * d].reshape(b, 4, d)
-        pool = obs[:, 4 * d : 4 * d + self.pool_size * d].reshape(b, self.pool_size, d)
+        b, d, k = obs.shape[0], self.dim, self.n_summaries
+        summaries = obs[:, : k * d].reshape(b, k, d)
+        scalars = obs[:, k * d : k * d + self.n_scalars]
+        start = k * d + self.n_scalars
+        pool = obs[:, start : start + self.pool_size * d].reshape(b, self.pool_size, d)
         avail = obs[:, -self.pool_size :]
-        return summaries, pool, avail
+        return summaries, scalars, pool, avail
 
     def forward(self, obs: torch.Tensor):
-        summaries, pool, avail = self._split(obs)
+        summaries, scalars, pool, avail = self._split(obs)
         n = self.pool_size
-        s = [summaries[:, i].unsqueeze(1).expand(-1, n, -1) for i in range(4)]
-        feats = torch.cat(
-            s + [pool] + [x * pool for x in s] + [avail.unsqueeze(-1)], dim=-1
-        )
+        s = [summaries[:, i].unsqueeze(1).expand(-1, n, -1) for i in range(self.n_summaries)]
+        sc = scalars.unsqueeze(1).expand(-1, n, -1)
+        feats = torch.cat(s + [pool] + [x * pool for x in s] + [sc, avail.unsqueeze(-1)], dim=-1)
         logits = self.scorer(feats).squeeze(-1)
         logits = logits.masked_fill(avail < 0.5, -1e9)
 
@@ -51,7 +59,7 @@ class ActorCritic(nn.Module):
         pool_mean = (pool * w).sum(1) / w.sum(1).clamp(min=1.0)
         remaining = w.sum(1) / self.pool_size
         value = self.critic(
-            torch.cat([summaries.reshape(summaries.shape[0], -1), pool_mean, remaining], dim=-1)
+            torch.cat([summaries.reshape(summaries.shape[0], -1), scalars, pool_mean, remaining], dim=-1)
         ).squeeze(-1)
         return logits, value
 

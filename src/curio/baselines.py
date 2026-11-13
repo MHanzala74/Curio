@@ -107,3 +107,28 @@ class LinUCBPolicy:
         self.A += np.outer(item, item)
         signal = (2.0 * float(clicked) - 1.0) if self.signed_reward else float(clicked)
         self.b += signal * item
+
+
+class OracleFatiguePolicy:
+    """Oracle for the long-horizon env: knows the true interest and fatigue.
+
+    ``extra_weight = 0`` is the myopic optimum (maximize the immediate click
+    probability). A positive ``extra_weight`` additionally avoids items similar
+    to current exposure, a crude proxy for planning ahead.
+    """
+
+    name = "oracle-fatigue"
+
+    def __init__(self, extra_weight: float = 0.0) -> None:
+        self.extra_weight = extra_weight
+
+    def act(self, env, obs) -> int:
+        u = env.user
+        scores = 3.0 * (env.pool @ u.interest) - (u.fatigue + self.extra_weight) * np.maximum(
+            0.0, env.pool @ u.exposure
+        )
+        scores[~env.action_masks()] = -np.inf
+        return int(np.argmax(scores))
+
+    def observe(self, *args, **kwargs) -> None:
+        pass

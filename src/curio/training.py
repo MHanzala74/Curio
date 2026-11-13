@@ -9,7 +9,7 @@ from .env import FeedEnv
 from .ppo import PPO, ActorCritic, PPOConfig
 
 
-def collect(env: FeedEnv, model: ActorCritic, episodes: int):
+def collect(env, model: ActorCritic, episodes: int):
     """Roll out `episodes` full episodes and return flat trajectory buffers."""
     obs_buf, act_buf, logp_buf, rew_buf, val_buf, done_buf = [], [], [], [], [], []
     ep_returns = []
@@ -30,13 +30,17 @@ def collect(env: FeedEnv, model: ActorCritic, episodes: int):
     return obs_buf, act_buf, logp_buf, rew_buf, val_buf, done_buf, ep_returns
 
 
-def train_ppo(seed: int, updates: int, episodes_per_update: int, log_every: int = 0, lr: float = 3e-3, **env_kwargs):
+def train_ppo(seed: int, updates: int, episodes_per_update: int, log_every: int = 0, lr: float = 3e-3,
+              gamma: float = 0.9, env_cls=FeedEnv, **env_kwargs):
     """Train a fresh actor-critic and return (model, history)."""
     torch.manual_seed(seed)
     np.random.seed(seed)
-    env = FeedEnv(seed=seed, **env_kwargs)
-    model = ActorCritic(env.pool_size, env.dim)
-    ppo = PPO(model, PPOConfig(lr=lr))
+    env = env_cls(seed=seed, **env_kwargs)
+    model = ActorCritic(
+        env.pool_size, env.dim,
+        n_summaries=getattr(env, "N_SUMMARIES", 4), n_scalars=getattr(env, "N_SCALARS", 0),
+    )
+    ppo = PPO(model, PPOConfig(lr=lr, gamma=gamma))
     history = []
     for update in range(1, updates + 1):
         obs, act, logp, rew, val, done, ep_returns = collect(env, model, episodes_per_update)
