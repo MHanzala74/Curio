@@ -33,7 +33,7 @@ sequential decision problem, which is exactly what RL is for.
 ## Roadmap
 
 - [x] Project scaffold
-- [ ] Gymnasium environment and simulated user
+- [x] Gymnasium environment and simulated user
 - [ ] PPO implementation (PyTorch) and baselines (random, greedy, bandit)
 - [ ] Learning curves and ablation table
 - [ ] Real feedback pipeline
@@ -50,3 +50,9 @@ pip install -r requirements.txt
 ## License
 
 MIT
+
+## Running the tests
+
+```bash
+PYTHONPATH=src pytest -q
+```
