@@ -18,36 +18,41 @@ class ActorCritic(nn.Module):
     def __init__(self, pool_size: int, dim: int, hidden: int = 64) -> None:
         super().__init__()
         self.pool_size, self.dim = pool_size, dim
-        # Per-item features: summary, item, summary*item, availability flag.
+        # Per-item features: 3 summaries (shown, clicked, skipped), the item,
+        # item * each summary, and an availability flag.
         self.scorer = nn.Sequential(
-            nn.Linear(3 * dim + 1, hidden), nn.Tanh(),
+            nn.Linear(7 * dim + 1, hidden), nn.Tanh(),
             nn.Linear(hidden, hidden), nn.Tanh(),
             nn.Linear(hidden, 1),
         )
         self.critic = nn.Sequential(
-            nn.Linear(2 * dim + 1, hidden), nn.Tanh(),
+            nn.Linear(4 * dim + 1, hidden), nn.Tanh(),
             nn.Linear(hidden, 1),
         )
 
     def _split(self, obs: torch.Tensor):
-        b = obs.shape[0]
-        summary = obs[:, : self.dim]
-        pool = obs[:, self.dim : self.dim + self.pool_size * self.dim]
-        pool = pool.reshape(b, self.pool_size, self.dim)
+        b, d = obs.shape[0], self.dim
+        summaries = obs[:, : 3 * d].reshape(b, 3, d)
+        pool = obs[:, 3 * d : 3 * d + self.pool_size * d].reshape(b, self.pool_size, d)
         avail = obs[:, -self.pool_size :]
-        return summary, pool, avail
+        return summaries, pool, avail
 
     def forward(self, obs: torch.Tensor):
-        summary, pool, avail = self._split(obs)
-        s = summary.unsqueeze(1).expand_as(pool)
-        feats = torch.cat([s, pool, s * pool, avail.unsqueeze(-1)], dim=-1)
+        summaries, pool, avail = self._split(obs)
+        n = self.pool_size
+        s = [summaries[:, i].unsqueeze(1).expand(-1, n, -1) for i in range(3)]
+        feats = torch.cat(
+            s + [pool] + [x * pool for x in s] + [avail.unsqueeze(-1)], dim=-1
+        )
         logits = self.scorer(feats).squeeze(-1)
         logits = logits.masked_fill(avail < 0.5, -1e9)
 
         w = avail.unsqueeze(-1)
         pool_mean = (pool * w).sum(1) / w.sum(1).clamp(min=1.0)
         remaining = w.sum(1) / self.pool_size
-        value = self.critic(torch.cat([summary, pool_mean, remaining], dim=-1)).squeeze(-1)
+        value = self.critic(
+            torch.cat([summaries.reshape(summaries.shape[0], -1), pool_mean, remaining], dim=-1)
+        ).squeeze(-1)
         return logits, value
 
     def act(self, obs: np.ndarray, greedy: bool = False):

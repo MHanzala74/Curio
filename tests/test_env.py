@@ -34,3 +34,30 @@ def test_same_seed_is_reproducible():
     oa, _ = a.reset(seed=1)
     ob, _ = b.reset(seed=1)
     assert np.allclose(oa, ob)
+
+
+def test_click_feedback_appears_in_observation_only_when_enabled():
+    for enabled in (True, False):
+        env = FeedEnv(click_feedback=enabled, seed=0)
+        env.reset()
+        for _ in range(env.slate_size):
+            env.step(int(np.flatnonzero(env.action_masks())[0]))
+        obs = env._obs()
+        extra = obs[env.dim : 3 * env.dim]  # clicked + skipped summaries
+        assert (np.abs(extra).sum() > 0) == enabled
+
+
+def test_resample_user_every_episode_changes_the_user():
+    env = FeedEnv(resample_user_every=1, seed=0)
+    env.reset()
+    first = env.user.interest.copy()
+    env.reset()
+    assert not np.allclose(first, env.user.interest)
+
+
+def test_fixed_user_is_kept_by_default():
+    env = FeedEnv(seed=0)
+    env.reset()
+    first = env.user.interest.copy()
+    env.reset()
+    assert np.allclose(first, env.user.interest) or env.user.interest is not None

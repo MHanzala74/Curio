@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from .env import FeedEnv
-from .ppo import PPO, ActorCritic
+from .ppo import PPO, ActorCritic, PPOConfig
 
 
 def collect(env: FeedEnv, model: ActorCritic, episodes: int):
@@ -30,13 +30,13 @@ def collect(env: FeedEnv, model: ActorCritic, episodes: int):
     return obs_buf, act_buf, logp_buf, rew_buf, val_buf, done_buf, ep_returns
 
 
-def train_ppo(seed: int, updates: int, episodes_per_update: int, log_every: int = 0):
+def train_ppo(seed: int, updates: int, episodes_per_update: int, log_every: int = 0, lr: float = 3e-3, **env_kwargs):
     """Train a fresh actor-critic and return (model, history)."""
     torch.manual_seed(seed)
     np.random.seed(seed)
-    env = FeedEnv(seed=seed)
+    env = FeedEnv(seed=seed, **env_kwargs)
     model = ActorCritic(env.pool_size, env.dim)
-    ppo = PPO(model)
+    ppo = PPO(model, PPOConfig(lr=lr))
     history = []
     for update in range(1, updates + 1):
         obs, act, logp, rew, val, done, ep_returns = collect(env, model, episodes_per_update)

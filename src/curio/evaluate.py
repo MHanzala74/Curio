@@ -13,6 +13,8 @@ def run_policy(policy, episodes: int, seed: int, **env_kwargs) -> dict:
     returns, clicks = [], []
     for _ in range(episodes):
         obs, _ = env.reset()
+        if hasattr(policy, "start_episode"):
+            policy.start_episode()
         done, total, n_clicks = False, 0.0, 0
         while not done:
             action = policy.act(env, obs)

@@ -39,13 +39,50 @@ class OracleGreedyPolicy:
         pass
 
 
+class OracleDiversePolicy:
+    """Oracle that knows the true interest AND avoids redundancy.
+
+    A strong reference: it combines personalization (true interest) with the
+    diversity strategy, so it approximates what a good policy should reach.
+    """
+
+    name = "oracle-diverse"
+
+    def __init__(self, diversity_weight: float = 0.5) -> None:
+        self.diversity_weight = diversity_weight
+
+    def act(self, env: FeedEnv, obs: np.ndarray) -> int:
+        scores = env.pool @ env.user.interest
+        if env.user.recent:
+            recent = np.stack(env.user.recent)
+            scores = scores - self.diversity_weight * (env.pool @ recent.T).max(axis=1)
+        scores[~env.action_masks()] = -np.inf
+        return int(np.argmax(scores))
+
+    def observe(self, *args, **kwargs) -> None:
+        pass
+
+
 class LinUCBPolicy:
+    """Contextual bandit. With ``reset_each_episode`` it is a per-user bandit
+    that only learns from the current episode's clicks (the fair comparison
+    when every episode has a new user)."""
+
     name = "linucb-bandit"
 
-    def __init__(self, dim: int, alpha: float = 0.5) -> None:
+    def __init__(self, dim: int, alpha: float = 0.5, reset_each_episode: bool = False) -> None:
         self.alpha = alpha
-        self.A = np.eye(dim)
-        self.b = np.zeros(dim)
+        self.dim = dim
+        self.reset_each_episode = reset_each_episode
+        self._reset()
+
+    def _reset(self) -> None:
+        self.A = np.eye(self.dim)
+        self.b = np.zeros(self.dim)
+
+    def start_episode(self) -> None:
+        if self.reset_each_episode:
+            self._reset()
 
     def act(self, env: FeedEnv, obs: np.ndarray) -> int:
         a_inv = np.linalg.inv(self.A)
