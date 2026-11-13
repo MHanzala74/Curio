@@ -26,11 +26,11 @@ ENV = dict(slate_size=10, resample_user_every=1)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--variant", choices=["click", "noclick", "baselines"], required=True)
+    parser.add_argument("--variant", choices=["click", "noclick", "belief", "baselines"], required=True)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0])
-    parser.add_argument("--updates", type=int, default=300)
-    parser.add_argument("--episodes-per-update", type=int, default=64)
-    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--updates", type=int, default=200)
+    parser.add_argument("--episodes-per-update", type=int, default=128)
+    parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--eval-episodes", type=int, default=300)
     parser.add_argument("--out", type=str, default="docs/runs")
     args = parser.parse_args()
@@ -43,22 +43,29 @@ def main() -> None:
         if args.variant == "baselines":
             runs = {
                 "random": run_policy(RandomPolicy(seed=seed), args.eval_episodes, eval_seed, **ENV),
-                "linucb (per-user)": run_policy(
+                "linucb (untuned)": run_policy(
                     LinUCBPolicy(8, reset_each_episode=True), args.eval_episodes, eval_seed, **ENV
+                ),
+                "linucb (tuned)": run_policy(
+                    LinUCBPolicy(8, alpha=2.0, reg=0.1, signed_reward=True, reset_each_episode=True),
+                    args.eval_episodes, eval_seed, **ENV,
                 ),
                 "oracle-greedy": run_policy(OracleGreedyPolicy(), args.eval_episodes, eval_seed, **ENV),
                 "oracle-diverse": run_policy(OracleDiversePolicy(), args.eval_episodes, eval_seed, **ENV),
             }
             payload = {"results": runs}
         else:
-            click = args.variant == "click"
+            click = args.variant in ("click", "belief")
+            belief = args.variant == "belief"
+            kw = dict(click_feedback=click, belief_state=belief, **ENV)
             model, history = train_ppo(
-                seed, args.updates, args.episodes_per_update, log_every=50,
-                lr=args.lr, click_feedback=click, **ENV,
+                seed, args.updates, args.episodes_per_update, log_every=50, lr=args.lr, **kw,
             )
-            result = run_ppo(model, args.eval_episodes, eval_seed, click_feedback=click, **ENV)
+            result = run_ppo(model, args.eval_episodes, eval_seed, **kw)
+            label = {"noclick": "ppo (no click feedback)", "click": "ppo (with click feedback)",
+                     "belief": "ppo (click feedback + belief state)"}[args.variant]
             payload = {
-                "results": {f"ppo ({'with' if click else 'no'} click feedback)": result},
+                "results": {label: result},
                 "train_curve": [h["train_return"] for h in history],
             }
         (out / f"{args.variant}_seed{seed}.json").write_text(json.dumps(payload, indent=2))

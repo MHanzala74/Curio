@@ -9,6 +9,11 @@ Two options control how hard (and how meaningful) the personalization task is:
 - ``click_feedback``: if True, the observation includes summaries of the items
   the user clicked and skipped earlier in the episode, so the policy can infer
   the user's taste. If False, the policy only sees what was shown.
+- ``belief_state``: if True (and click feedback is on), the observation also
+  contains a running ridge-regression estimate of the user's interest vector,
+  computed from clicks (+1) and skips (-1). This is a hand-built belief state
+  for the partially observable problem; PPO still has to learn *how to act*
+  on it (e.g. trade personalization against diversity).
 - ``resample_user_every``: if set to N, a brand new simulated user is drawn
   every N episodes. With N=1 the policy cannot memorize one user and must
   personalize from in-episode feedback.
@@ -33,6 +38,7 @@ class FeedEnv(gym.Env):
         dim: int = 8,
         novelty_weight: float = 0.3,
         click_feedback: bool = False,
+        belief_state: bool = False,
         resample_user_every: int | None = None,
         seed: int | None = None,
     ) -> None:
@@ -42,12 +48,13 @@ class FeedEnv(gym.Env):
         self.dim = dim
         self.novelty_weight = novelty_weight
         self.click_feedback = click_feedback
+        self.belief_state = belief_state
         self.resample_user_every = resample_user_every
         self._seed = seed
 
         # Observation layout:
-        #   [shown summary | clicked summary | skipped summary | pool | availability]
-        obs_len = 3 * dim + pool_size * dim + pool_size
+        #   [shown | clicked | skipped | belief | pool | availability]
+        obs_len = 4 * dim + pool_size * dim + pool_size
         self.observation_space = spaces.Box(-1.0, 1.0, shape=(obs_len,), dtype=np.float32)
         self.action_space = spaces.Discrete(pool_size)
 
@@ -59,6 +66,8 @@ class FeedEnv(gym.Env):
         self.episode_count = 0
         self.clicked_items: list[np.ndarray] = []
         self.skipped_items: list[np.ndarray] = []
+        self._belief_A = 0.1 * np.eye(dim)
+        self._belief_b = np.zeros(dim)
 
     def _new_pool(self) -> np.ndarray:
         items = self.rng.normal(size=(self.pool_size, self.dim))
@@ -75,8 +84,13 @@ class FeedEnv(gym.Env):
             skipped = self._mean_or_zero(self.skipped_items)
         else:
             clicked = skipped = np.zeros(self.dim)
+        if self.click_feedback and self.belief_state:
+            belief = np.linalg.solve(self._belief_A, self._belief_b)
+            belief = np.clip(belief, -1.0, 1.0)
+        else:
+            belief = np.zeros(self.dim)
         obs = np.concatenate(
-            [shown, clicked, skipped, self.pool.ravel(), self.available.astype(float)]
+            [shown, clicked, skipped, belief, self.pool.ravel(), self.available.astype(float)]
         )
         return obs.astype(np.float32)
 
@@ -100,6 +114,8 @@ class FeedEnv(gym.Env):
         self.available = np.ones(self.pool_size, dtype=bool)
         self.step_count = 0
         self.clicked_items, self.skipped_items = [], []
+        self._belief_A = 0.1 * np.eye(self.dim)
+        self._belief_b = np.zeros(self.dim)
         return self._obs(), {}
 
     def step(self, action: int):
@@ -113,6 +129,8 @@ class FeedEnv(gym.Env):
         item = self.pool[action]
         clicked, novelty = self.user.react(item)
         (self.clicked_items if clicked else self.skipped_items).append(item.copy())
+        self._belief_A += np.outer(item, item)
+        self._belief_b += (1.0 if clicked else -1.0) * item
         self.available[action] = False
         self.step_count += 1
 

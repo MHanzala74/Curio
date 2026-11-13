@@ -18,29 +18,29 @@ class ActorCritic(nn.Module):
     def __init__(self, pool_size: int, dim: int, hidden: int = 64) -> None:
         super().__init__()
         self.pool_size, self.dim = pool_size, dim
-        # Per-item features: 3 summaries (shown, clicked, skipped), the item,
+        # Per-item features: 4 summaries (shown, clicked, skipped, belief), the item,
         # item * each summary, and an availability flag.
         self.scorer = nn.Sequential(
-            nn.Linear(7 * dim + 1, hidden), nn.Tanh(),
+            nn.Linear(9 * dim + 1, hidden), nn.Tanh(),
             nn.Linear(hidden, hidden), nn.Tanh(),
             nn.Linear(hidden, 1),
         )
         self.critic = nn.Sequential(
-            nn.Linear(4 * dim + 1, hidden), nn.Tanh(),
+            nn.Linear(5 * dim + 1, hidden), nn.Tanh(),
             nn.Linear(hidden, 1),
         )
 
     def _split(self, obs: torch.Tensor):
         b, d = obs.shape[0], self.dim
-        summaries = obs[:, : 3 * d].reshape(b, 3, d)
-        pool = obs[:, 3 * d : 3 * d + self.pool_size * d].reshape(b, self.pool_size, d)
+        summaries = obs[:, : 4 * d].reshape(b, 4, d)
+        pool = obs[:, 4 * d : 4 * d + self.pool_size * d].reshape(b, self.pool_size, d)
         avail = obs[:, -self.pool_size :]
         return summaries, pool, avail
 
     def forward(self, obs: torch.Tensor):
         summaries, pool, avail = self._split(obs)
         n = self.pool_size
-        s = [summaries[:, i].unsqueeze(1).expand(-1, n, -1) for i in range(3)]
+        s = [summaries[:, i].unsqueeze(1).expand(-1, n, -1) for i in range(4)]
         feats = torch.cat(
             s + [pool] + [x * pool for x in s] + [avail.unsqueeze(-1)], dim=-1
         )

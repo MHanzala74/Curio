@@ -70,14 +70,24 @@ class LinUCBPolicy:
 
     name = "linucb-bandit"
 
-    def __init__(self, dim: int, alpha: float = 0.5, reset_each_episode: bool = False) -> None:
+    def __init__(
+        self,
+        dim: int,
+        alpha: float = 0.5,
+        reset_each_episode: bool = False,
+        reg: float = 1.0,
+        signed_reward: bool = False,
+    ) -> None:
         self.alpha = alpha
         self.dim = dim
         self.reset_each_episode = reset_each_episode
+        self.reg = reg
+        # If True, a skip counts as -1 evidence instead of 0 (uses negative feedback).
+        self.signed_reward = signed_reward
         self._reset()
 
     def _reset(self) -> None:
-        self.A = np.eye(self.dim)
+        self.A = self.reg * np.eye(self.dim)
         self.b = np.zeros(self.dim)
 
     def start_episode(self) -> None:
@@ -95,4 +105,5 @@ class LinUCBPolicy:
 
     def observe(self, item: np.ndarray, clicked: bool) -> None:
         self.A += np.outer(item, item)
-        self.b += float(clicked) * item
+        signal = (2.0 * float(clicked) - 1.0) if self.signed_reward else float(clicked)
+        self.b += signal * item

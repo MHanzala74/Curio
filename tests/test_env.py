@@ -61,3 +61,24 @@ def test_fixed_user_is_kept_by_default():
     first = env.user.interest.copy()
     env.reset()
     assert np.allclose(first, env.user.interest) or env.user.interest is not None
+
+
+def test_belief_points_toward_true_interest_after_a_slate():
+    cos = []
+    for seed in range(20):
+        env = FeedEnv(slate_size=10, click_feedback=True, belief_state=True,
+                      resample_user_every=1, seed=seed)
+        env.reset()
+        for _ in range(env.slate_size):
+            env.step(int(np.flatnonzero(env.action_masks())[0]))
+        belief = env._obs()[3 * env.dim : 4 * env.dim]
+        cos.append(float(belief @ env.user.interest
+                         / (np.linalg.norm(belief) * np.linalg.norm(env.user.interest) + 1e-8)))
+    assert np.mean(cos) > 0.3
+
+
+def test_belief_is_zero_when_disabled():
+    env = FeedEnv(click_feedback=True, belief_state=False, seed=0)
+    env.reset()
+    env.step(0)
+    assert np.allclose(env._obs()[3 * env.dim : 4 * env.dim], 0.0)
