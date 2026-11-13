@@ -40,7 +40,8 @@ sequential decision problem, which is exactly what RL is for.
 - [x] Learning curves and multi-seed comparison (5 seeds, mean ± std)
 - [x] Expose click feedback in the observation so the policy can personalize (partial success, see below)
 - [x] Tuned LinUCB baseline and belief-state PPO variant
-- [ ] More seeds, and a longer-horizon task where RL should help more
+- [x] Longer-horizon task with fatigue and churn (RL beats tuned LinUCB, cause not yet isolated)
+- [ ] Fatigue-aware bandit baseline, more seeds, longer PPO training
 - [ ] Real feedback pipeline
 - [ ] LLM agents (collector, summarizer, reflector)
 - [ ] GitHub Actions daily run
@@ -164,6 +165,65 @@ python aggregate.py
 matters mostly through diversity and boredom, and a tuned contextual bandit
 captures most of the achievable gain with very little data. A fairer test of RL's
 advantage needs longer horizons, where today's choices change later states more.
+
+## Long-horizon experiment (fatigue and churn)
+
+![Long-horizon results](docs/long_horizon.png)
+
+The previous task rewarded one-day decisions. Here an episode is up to **7 days**
+with a new user each episode (`curio.env_longterm.LongTermFeedEnv`):
+
+- Reward is **only clicks**, so diversity matters only if it keeps the user around.
+- Fatigue: showing items similar to recent exposure lowers click probability, and
+  the effect carries across days.
+- The user's interest drifts toward clicked items.
+- If satisfaction (a running average of daily CTR) drops below a threshold, the
+  user **churns** and the episode ends, losing all future clicks.
+
+PPO sees what it showed (so it can track exposure), clicks and skips, a belief
+about the user's interest, and day-level CTR history. LinUCB was tuned on
+validation seeds until its optimum was on a flat plateau.
+
+| Method | Return (clicks per episode, mean ± std, 3 seeds) | Days before churn (max 7) |
+|---|---|---|
+| random | 4.20 ± 0.04 | 2.20 |
+| linucb (tuned) | 5.74 ± 0.11 | 2.67 |
+| ppo (gamma=0.9) | 8.36 ± 0.10 | 3.44 |
+| ppo (gamma=0.99) | 8.41 ± 0.08 | 3.46 |
+| oracle-myopic | 14.59 ± 0.16 | 5.06 |
+| oracle-lookahead | 14.85 ± 0.47 | 5.11 |
+
+Paired differences (same evaluation users per seed):
+- ppo (gamma=0.99) minus linucb (tuned): +2.68 ± 0.17 (first wins on 3/3 seeds)
+- ppo (gamma=0.99) minus ppo (gamma=0.9): +0.05 ± 0.17 (first wins on 2/3 seeds)
+- oracle-lookahead minus oracle-myopic: +0.27 ± 0.50 (first wins on 2/3 seeds)
+
+PPO closes 40% of the gap between random and oracle-lookahead.
+
+Reproduce with:
+
+```bash
+for v in baselines ppo90 ppo99; do
+  PYTHONPATH=src python long_horizon.py --variant $v --seeds 0 1 2
+done
+python aggregate_long.py
+```
+
+**Reading these results honestly**
+
+- PPO clearly beats tuned LinUCB here (+2.7 clicks per episode, 3/3 seeds) and
+  keeps users about 0.8 days longer. This is the first setting where RL shows a
+  solid advantage over a tuned bandit.
+- The advantage is **not shown to come from long-horizon planning**. Changing the
+  discount from 0.9 to 0.99 made no difference (+0.05 ± 0.17), and even the
+  lookahead oracle is only marginally better than the myopic one (+0.27 ± 0.50).
+  A more likely explanation is that LinUCB ignores fatigue entirely, while PPO
+  learns a fatigue-aware policy from its observations. A fatigue-aware bandit
+  would be a fairer baseline and is on the roadmap.
+- PPO closes only about 40% of the gap to the oracles, which know the true
+  interest. Training curves were still improving, so more training may help.
+- Three seeds, one simulator with hand-chosen constants (the oracle-lookahead
+  weight was picked on a separate seed, not the evaluation seeds).
 
 ## Running the tests
 
