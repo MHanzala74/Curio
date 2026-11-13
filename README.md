@@ -37,7 +37,8 @@ sequential decision problem, which is exactly what RL is for.
 - [x] Project scaffold
 - [x] Gymnasium environment and simulated user
 - [x] PPO implementation (PyTorch) and baselines (random, greedy, bandit)
-- [x] Learning curves and first comparison table (single seed)
+- [x] Learning curves and multi-seed comparison (5 seeds, mean ± std)
+- [ ] Expose click feedback in the observation so the policy can personalize
 - [ ] Real feedback pipeline
 - [ ] LLM agents (collector, summarizer, reflector)
 - [ ] GitHub Actions daily run
@@ -53,35 +54,49 @@ pip install -r requirements.txt
 
 MIT
 
-## Results (simulated user)
+## Results (simulated user, 5 seeds)
 
-![Learning curve](docs/learning_curve.png)
+![Learning curve over 5 seeds](docs/multi_seed_curve.png)
 
-Evaluated on 300 fresh episodes with the same seed for every method:
+Each seed trains a fresh PPO agent and evaluates every method on 300 episodes
+with a **different simulated user** than the one used in training:
 
-| Method | Mean episode return | Click-through rate |
+| Method | Mean episode return (mean ± std over 5 seeds) | CTR |
 |---|---|---|
-| random | 3.535 | 0.461 |
-| linucb-bandit | 4.530 | 0.719 |
-| oracle-greedy | 4.565 | 0.729 |
-| ppo (ours) | 4.659 | 0.679 |
+| random | 3.454 ± 0.038 | 0.443 ± 0.007 |
+| linucb-bandit | 4.443 ± 0.049 | 0.701 ± 0.011 |
+| oracle-greedy | 4.450 ± 0.030 | 0.706 ± 0.007 |
+| ppo (ours) | 4.765 ± 0.057 | 0.706 ± 0.012 |
+
+Paired difference (PPO - LinUCB): +0.323 ± 0.044; PPO wins on 5/5 seeds.
 
 Reproduce with:
 
 ```bash
-PYTHONPATH=src python train.py --updates 120
+PYTHONPATH=src python multi_seed.py --seeds 5
 ```
 
-**Honest notes**
+### What PPO actually learned (important)
 
-- This is a **single seed** and the gaps between PPO, LinUCB and the oracle are
-  small, so they are not statistically meaningful yet. Multi-seed runs with
-  confidence intervals are the next step.
-- PPO beating the bandit is mostly explained by the reward including a novelty
-  term, which a one-step bandit cannot optimize. The simulated user is simple,
-  so these numbers say little about performance on a real person.
-- The oracle-greedy policy peeks at the true user interest, so it is a
+PPO beats the greedy baselines on all 5 seeds, but the reason is **not
+personalization**. In the current environment the observation only contains the
+items that were shown, not whether the user clicked them, so the policy cannot
+infer a user's taste. A diagnostic run confirmed this: the trained policy keeps
+a click-through rate of about 0.69 on a user whose interest vector has cosine
+similarity -0.5 with the training user.
+
+What it learned instead is a **diversity strategy**: showing items that are
+dissimilar to each other lowers the simulated user's boredom and earns the
+novelty bonus, something the one-step greedy baselines ignore. That is a real
+sequential effect, but it is a user-agnostic one.
+
+**Other caveats**
+
+- The simulated user is simple, so these numbers say little about a real person.
+- Oracle-greedy peeks at the true interest and ignores novelty; it is a
   reference point, not a fair competitor.
+- Next fix: expose click feedback in the observation so the policy can
+  personalize within an episode, then re-run this comparison.
 
 ## Running the tests
 
