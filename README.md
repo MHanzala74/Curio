@@ -39,7 +39,8 @@ sequential decision problem, which is exactly what RL is for.
 - [x] PPO implementation (PyTorch) and baselines (random, greedy, bandit)
 - [x] Learning curves and multi-seed comparison (5 seeds, mean ± std)
 - [x] Expose click feedback in the observation so the policy can personalize (partial success, see below)
-- [ ] Stronger baselines and more seeds for the personalization task
+- [x] Tuned LinUCB baseline and belief-state PPO variant
+- [ ] More seeds, and a longer-horizon task where RL should help more
 - [ ] Real feedback pipeline
 - [ ] LLM agents (collector, summarizer, reflector)
 - [ ] GitHub Actions daily run
@@ -99,49 +100,70 @@ sequential effect, but it is a user-agnostic one.
 - The follow-up experiment below adds click feedback to the observation.
 - These results were produced with the code at tag `v0.1-no-click-feedback`.
 
-## Personalization experiment (click feedback)
+## Personalization experiment
 
 ![Personalization results](docs/personalization.png)
 
-To test real personalization, every episode now uses a **brand-new simulated
-user** and a longer slate of 10 items, so a policy cannot memorize one user.
-The observation includes summaries of the items clicked and skipped earlier in
-the episode (`click_feedback=True`). The "no click feedback" ablation removes
-exactly that information.
+To test real personalization, every episode uses a **brand-new simulated user**
+and a slate of 10 items, so a policy cannot memorize one user. Three PPO
+variants differ only in what they observe:
+
+- **no click feedback**: sees only which items were shown
+- **click feedback**: also sees summaries of clicked and skipped items
+- **click feedback + belief state**: also sees a running ridge-regression
+  estimate of the user's interest (clicks = +1, skips = -1)
+
+The per-user LinUCB baseline was tuned on separate validation seeds (100-102,
+never the evaluation seeds) over three rounds of grid search until the optimum
+was interior (`alpha=2.0, reg=0.1`, skips counted as negative evidence; see
+`tune_linucb.py`). An untuned version is shown for reference.
 
 | Method | Episode return (mean ± std, 3 seeds) | CTR |
 |---|---|---|
 | random | 6.048 ± 0.029 | 0.401 |
-| linucb (per-user) | 6.116 ± 0.080 | 0.445 |
-| ppo (no click feedback) | 6.630 ± 0.138 | 0.429 |
-| ppo (with click feedback) | 6.866 ± 0.051 | 0.460 |
+| linucb (untuned) | 6.116 ± 0.080 | 0.445 |
+| ppo (no click feedback) | 6.642 ± 0.034 | 0.428 |
+| ppo (with click feedback) | 6.894 ± 0.109 | 0.467 |
+| linucb (tuned) | 6.915 ± 0.065 | 0.468 |
+| ppo (click feedback + belief state) | 6.974 ± 0.069 | 0.468 |
 | oracle-greedy | 7.554 ± 0.088 | 0.597 |
 | oracle-diverse | 7.979 ± 0.093 | 0.614 |
 
-Paired difference, PPO with vs. without click feedback: +0.236 ± 0.093 (with-feedback wins on 3/3 seeds).
-Paired difference, PPO with click feedback vs. per-user LinUCB: +0.751 ± 0.054 (wins on 3/3 seeds).
+Paired differences (same evaluation users and pools per seed):
+- ppo (with click feedback) minus ppo (no click feedback): +0.252 ± 0.075 (ppo (with click feedback) wins on 3/3 seeds)
+- ppo (click feedback + belief state) minus ppo (with click feedback): +0.080 ± 0.056 (ppo (click feedback + belief state) wins on 3/3 seeds)
+- ppo (click feedback + belief state) minus linucb (tuned): +0.059 ± 0.069 (ppo (click feedback + belief state) wins on 2/3 seeds)
+- ppo (with click feedback) minus linucb (tuned): -0.021 ± 0.067 (ppo (with click feedback) wins on 1/3 seeds)
 
 Reproduce with:
 
 ```bash
-PYTHONPATH=src python personalization.py --variant baselines --seeds 0 1 2
-PYTHONPATH=src python personalization.py --variant noclick   --seeds 0 1 2
-PYTHONPATH=src python personalization.py --variant click     --seeds 0 1 2
+PYTHONPATH=src python tune_linucb.py
+for v in baselines noclick click belief; do
+  PYTHONPATH=src python personalization.py --variant $v --seeds 0 1 2
+done
 python aggregate.py
 ```
 
 **Reading these results honestly**
 
-- Click feedback helps: PPO improves by about +0.24 return on all 3 seeds, which
-  supports the claim that it learns some personalization from in-episode clicks.
-- It is only **partial**. PPO closes roughly 40% of the gap between random and
-  the oracle-diverse reference, and its CTR (0.46) is far below the oracles (0.60).
-- Without click feedback PPO still beats random, which matches the earlier
-  finding that part of the gain is a user-agnostic diversity strategy.
-- The per-user LinUCB baseline barely beats random. With only 10 interactions per
-  user and default hyperparameters it is probably under-tuned, so the PPO vs.
-  LinUCB gap should not be over-interpreted. Tuning it is on the roadmap.
-- Only 3 seeds, so standard deviations are rough.
+- Click feedback clearly helps PPO (+0.25 return, 3/3 seeds), so the agent does
+  learn some personalization from in-episode clicks.
+- **A properly tuned bandit matches PPO.** PPO with the belief state is +0.06
+  over tuned LinUCB, with a standard deviation of 0.07 over 3 seeds, which is
+  not a meaningful difference. An earlier version of this README reported a large
+  PPO advantage over LinUCB; that came from comparing against an untuned
+  baseline (6.12) and has been removed.
+- The belief state adds a small gain (+0.08, within noise at 3 seeds).
+- Both PPO and tuned LinUCB are still far from the oracles (CTR 0.47 vs 0.60),
+  so most of the personalization gap is not yet closed. The oracles know the
+  true interest, so they are references, not fair competitors.
+- Only 3 seeds, one simulator, and 10 interactions per user.
+
+**Where this leaves the RL claim:** in this simulator, the sequential structure
+matters mostly through diversity and boredom, and a tuned contextual bandit
+captures most of the achievable gain with very little data. A fairer test of RL's
+advantage needs longer horizons, where today's choices change later states more.
 
 ## Running the tests
 

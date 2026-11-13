@@ -22,40 +22,46 @@ def load(variant: str):
 def main() -> None:
     scores: dict[str, list[float]] = {}
     ctrs: dict[str, list[float]] = {}
-    for variant in ["baselines", "noclick", "click"]:
+    for variant in ["baselines", "noclick", "click", "belief"]:
         for payload in load(variant):
             for name, r in payload["results"].items():
                 scores.setdefault(name, []).append(r["return"])
                 ctrs.setdefault(name, []).append(r["ctr"])
 
-    order = ["random", "linucb (per-user)", "ppo (no click feedback)",
-             "ppo (with click feedback)", "oracle-greedy", "oracle-diverse"]
+    order = ["random", "linucb (untuned)", "ppo (no click feedback)",
+             "ppo (with click feedback)", "linucb (tuned)",
+             "ppo (click feedback + belief state)", "oracle-greedy", "oracle-diverse"]
     lines = [f"| Method | Episode return (mean ± std, {len(SEEDS)} seeds) | CTR |", "|---|---|---|"]
     for name in order:
         lines.append(f"| {name} | {np.mean(scores[name]):.3f} ± {np.std(scores[name], ddof=1):.3f} "
                      f"| {np.mean(ctrs[name]):.3f} |")
 
-    diff = np.array(scores["ppo (with click feedback)"]) - np.array(scores["ppo (no click feedback)"])
-    vs_bandit = np.array(scores["ppo (with click feedback)"]) - np.array(scores["linucb (per-user)"])
+    def paired(a_name: str, b_name: str) -> str:
+        d = np.array(scores[a_name]) - np.array(scores[b_name])
+        return (f"- {a_name} minus {b_name}: {d.mean():+.3f} ± {d.std(ddof=1):.3f} "
+                f"({a_name} wins on {int((d > 0).sum())}/{len(SEEDS)} seeds)")
+
     lines += [
         "",
-        f"Paired difference, PPO with vs. without click feedback: {diff.mean():+.3f} ± "
-        f"{diff.std(ddof=1):.3f} (with-feedback wins on {int((diff > 0).sum())}/{len(SEEDS)} seeds).",
-        f"Paired difference, PPO with click feedback vs. per-user LinUCB: {vs_bandit.mean():+.3f} ± "
-        f"{vs_bandit.std(ddof=1):.3f} (wins on {int((vs_bandit > 0).sum())}/{len(SEEDS)} seeds).",
+        "Paired differences (same evaluation users and pools per seed):",
+        paired("ppo (with click feedback)", "ppo (no click feedback)"),
+        paired("ppo (click feedback + belief state)", "ppo (with click feedback)"),
+        paired("ppo (click feedback + belief state)", "linucb (tuned)"),
+        paired("ppo (with click feedback)", "linucb (tuned)"),
     ]
     Path("docs/personalization_results.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
-    fig, ax = plt.subplots(1, 2, figsize=(11, 3.8))
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4.2))
     means = [np.mean(scores[n]) for n in order]
     errs = [np.std(scores[n], ddof=1) for n in order]
-    colors = ["gray", "tab:green", "tab:orange", "tab:blue", "tab:purple", "tab:red"]
+    colors = ["gray", "#9bd39b", "tab:orange", "tab:blue", "tab:green", "tab:cyan", "tab:purple", "tab:red"]
     ax[0].barh(order, means, xerr=errs, color=colors)
     ax[0].set_xlim(5.5, 8.4)
+    ax[0].invert_yaxis()
     ax[0].set_xlabel("Mean episode return")
     ax[0].set_title("Personalization task (new user every episode)")
-    for variant, label in [("noclick", "no click feedback"), ("click", "with click feedback")]:
+    for variant, label in [("noclick", "no click feedback"), ("click", "with click feedback"), ("belief", "click + belief state")]:
         curves = np.array([p["train_curve"] for p in load(variant)])
         k = 10
         sm = np.array([np.convolve(c, np.ones(k) / k, mode="valid") for c in curves])
