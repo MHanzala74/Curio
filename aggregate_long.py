@@ -14,7 +14,7 @@ import numpy as np
 RUNS = Path("docs/runs_long")
 SEEDS = [0, 1, 2]
 ORDER = ["random", "linucb (tuned)", "ppo (gamma=0.9)", "ppo (gamma=0.99)",
-         "oracle-myopic", "oracle-lookahead"]
+         "linucb (fatigue-aware)", "oracle-myopic", "oracle-lookahead"]
 
 
 def main() -> None:
@@ -38,11 +38,15 @@ def main() -> None:
 
     lines += ["", "Paired differences (same evaluation users per seed):",
               paired("ppo (gamma=0.99)", "linucb (tuned)"),
+              paired("linucb (fatigue-aware)", "ppo (gamma=0.99)"),
+              paired("linucb (fatigue-aware)", "linucb (tuned)"),
               paired("ppo (gamma=0.99)", "ppo (gamma=0.9)"),
               paired("oracle-lookahead", "oracle-myopic")]
     lo, hi = np.mean(ret["random"]), np.mean(ret["oracle-lookahead"])
     frac = (np.mean(ret["ppo (gamma=0.99)"]) - lo) / (hi - lo)
-    lines += ["", f"PPO closes {100 * frac:.0f}% of the gap between random and oracle-lookahead."]
+    frac_b = (np.mean(ret["linucb (fatigue-aware)"]) - lo) / (hi - lo)
+    lines += ["", f"Share of the random-to-oracle-lookahead gap closed: PPO {100 * frac:.0f}%, "
+                  f"fatigue-aware LinUCB {100 * frac_b:.0f}%."]
     Path("docs/long_horizon_results.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
@@ -50,7 +54,7 @@ def main() -> None:
     means = [np.mean(ret[n]) for n in ORDER]
     errs = [np.std(ret[n], ddof=1) for n in ORDER]
     ax.barh(ORDER, means, xerr=errs,
-            color=["gray", "tab:green", "#8fb8e8", "tab:blue", "tab:purple", "tab:red"])
+            color=["gray", "#9bd39b", "#8fb8e8", "tab:blue", "tab:green", "tab:purple", "tab:red"])
     ax.invert_yaxis()
     ax.set_xlabel("Clicks per episode (7-day horizon, churn ends the episode)")
     ax.set_title("Long-horizon task with fatigue and churn")

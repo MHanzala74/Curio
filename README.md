@@ -40,8 +40,9 @@ sequential decision problem, which is exactly what RL is for.
 - [x] Learning curves and multi-seed comparison (5 seeds, mean ± std)
 - [x] Expose click feedback in the observation so the policy can personalize (partial success, see below)
 - [x] Tuned LinUCB baseline and belief-state PPO variant
-- [x] Longer-horizon task with fatigue and churn (RL beats tuned LinUCB, cause not yet isolated)
-- [ ] Fatigue-aware bandit baseline, more seeds, longer PPO training
+- [x] Longer-horizon task with fatigue and churn
+- [x] Fatigue-aware bandit baseline (it beats PPO at the current training budget)
+- [ ] Longer PPO training / better architecture, more seeds
 - [ ] Real feedback pipeline
 - [ ] LLM agents (collector, summarizer, reflector)
 - [ ] GitHub Actions daily run
@@ -181,8 +182,14 @@ with a new user each episode (`curio.env_longterm.LongTermFeedEnv`):
   user **churns** and the episode ends, losing all future clicks.
 
 PPO sees what it showed (so it can track exposure), clicks and skips, a belief
-about the user's interest, and day-level CTR history. LinUCB was tuned on
-validation seeds until its optimum was on a flat plateau.
+about the user's interest, and day-level CTR history. Two LinUCB baselines are
+included, both tuned on separate validation seeds:
+
+- **linucb (tuned)**: per-user bandit that ignores fatigue.
+- **linucb (fatigue-aware)**: the same bandit plus a penalty on items similar to
+  its own running exposure vector (computed from the items it showed, never from
+  hidden user state). Its hyperparameters were tuned over three rounds of grid
+  search until the best setting had worse neighbours on every side.
 
 | Method | Return (clicks per episode, mean ± std, 3 seeds) | Days before churn (max 7) |
 |---|---|---|
@@ -190,15 +197,18 @@ validation seeds until its optimum was on a flat plateau.
 | linucb (tuned) | 5.74 ± 0.11 | 2.67 |
 | ppo (gamma=0.9) | 8.36 ± 0.10 | 3.44 |
 | ppo (gamma=0.99) | 8.41 ± 0.08 | 3.46 |
+| linucb (fatigue-aware) | 11.70 ± 0.34 | 4.31 |
 | oracle-myopic | 14.59 ± 0.16 | 5.06 |
 | oracle-lookahead | 14.85 ± 0.47 | 5.11 |
 
 Paired differences (same evaluation users per seed):
 - ppo (gamma=0.99) minus linucb (tuned): +2.68 ± 0.17 (first wins on 3/3 seeds)
+- linucb (fatigue-aware) minus ppo (gamma=0.99): +3.28 ± 0.30 (first wins on 3/3 seeds)
+- linucb (fatigue-aware) minus linucb (tuned): +5.96 ± 0.36 (first wins on 3/3 seeds)
 - ppo (gamma=0.99) minus ppo (gamma=0.9): +0.05 ± 0.17 (first wins on 2/3 seeds)
 - oracle-lookahead minus oracle-myopic: +0.27 ± 0.50 (first wins on 2/3 seeds)
 
-PPO closes 40% of the gap between random and oracle-lookahead.
+Share of the random-to-oracle-lookahead gap closed: PPO 40%, fatigue-aware LinUCB 70%.
 
 Reproduce with:
 
@@ -211,19 +221,19 @@ python aggregate_long.py
 
 **Reading these results honestly**
 
-- PPO clearly beats tuned LinUCB here (+2.7 clicks per episode, 3/3 seeds) and
-  keeps users about 0.8 days longer. This is the first setting where RL shows a
-  solid advantage over a tuned bandit.
-- The advantage is **not shown to come from long-horizon planning**. Changing the
-  discount from 0.9 to 0.99 made no difference (+0.05 ± 0.17), and even the
+- Against a fatigue-unaware bandit, PPO looks strong (+2.7 clicks per episode).
+  That comparison was misleading: **a bandit with a simple fatigue penalty beats
+  PPO by +3.3 clicks per episode on all 3 seeds** and closes about 70% of the gap to
+  the oracles, versus 40% for PPO. Most of PPO's earlier advantage was the
+  fatigue information, not reinforcement learning as such.
+- Changing the discount from 0.9 to 0.99 made no difference (+0.05 ± 0.17), and the
   lookahead oracle is only marginally better than the myopic one (+0.27 ± 0.50).
-  A more likely explanation is that LinUCB ignores fatigue entirely, while PPO
-  learns a fatigue-aware policy from its observations. A fatigue-aware bandit
-  would be a fairer baseline and is on the roadmap.
-- PPO closes only about 40% of the gap to the oracles, which know the true
-  interest. Training curves were still improving, so more training may help.
-- Three seeds, one simulator with hand-chosen constants (the oracle-lookahead
-  weight was picked on a separate seed, not the evaluation seeds).
+  In this simulator, planning ahead adds little beyond avoiding fatigue.
+- PPO's training curves were still improving after 200 updates, so a longer run
+  or a better-suited architecture might narrow the gap. This has not been tested
+  yet, so the result is "PPO at this training budget loses to a good heuristic",
+  not "RL cannot win here".
+- Three seeds, one simulator with hand-chosen constants.
 
 ## Running the tests
 

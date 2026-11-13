@@ -10,6 +10,11 @@
       "ctr": 0.43090234857849197,
       "days": 2.6966666666666668
     },
+    "linucb (fatigue-aware)": {
+      "return": 11.383333333333333,
+      "ctr": 0.5412044374009509,
+      "days": 4.206666666666667
+    },
     "oracle-myopic": {
       "return": 14.7,
       "ctr": 0.5757180156657964,
@@ -24,5 +29,10 @@
   "linucb_params": {
     "alpha": 8.0,
     "reg": 0.3
+  },
+  "fatigue_linucb_params": {
+    "alpha": 0.5,
+    "beta": 6.0,
+    "decay": 0.97
   }
 }
