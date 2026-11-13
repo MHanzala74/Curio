@@ -1,4 +1,4 @@
-# rl-feed-agent
+# curio-rl
 
 A multi-agent news feed curator that learns **your** taste using real
 reinforcement learning (PPO actor-critic), not just a bandit.
