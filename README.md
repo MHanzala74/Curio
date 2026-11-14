@@ -12,6 +12,15 @@ RL is really better than a well-tuned contextual bandit for this task.
 > against live arXiv / Hacker News / Anthropic APIs or on GitHub Actions** (see
 > [Limitations](#limitations)).
 
+## Documentation
+
+The full technical documentation is in **[docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)**:
+concepts and glossary, architecture, installation and configuration, the simulation
+environments and algorithms, experiment protocol and reproducibility, the live pipeline
+and CLI reference, GitHub integration and automation, data formats, a module reference,
+testing, security and privacy, troubleshooting, limitations, change history, and the
+[references](docs/DOCUMENTATION.md#17-references) (papers, APIs and libraries) with links.
+
 ## Architecture
 
 ```mermaid
@@ -79,7 +88,7 @@ number of seeds. Earlier results remain reproducible via the tag
 git clone https://github.com/MHanzala74/Curio && cd Curio
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-PYTHONPATH=src pytest -q                              # 52 tests
+PYTHONPATH=src pytest -q                              # 57 tests
 
 # Live pipeline demo, offline, with bundled synthetic items:
 export PYTHONPATH=src
@@ -403,9 +412,10 @@ src/curio/
   cli.py                      daily / publish / sync-feedback / feedback / reflect
 models/curio_policy.pt        trained policy weights (seed-0 PPO run)
 deploy/daily.yml              GitHub Actions workflow template
+docs/DOCUMENTATION.md         full technical documentation and references
 docs/                         result tables, plots, per-seed run files
 *.py (repo root)              experiment scripts: multi_seed, personalization, long_horizon, ...
-tests/                        52 tests
+tests/                        57 tests
 ```
 
 ## Roadmap
