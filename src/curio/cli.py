@@ -5,12 +5,14 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 from pathlib import Path
 
 import numpy as np
 
 from .agents import Reflector, Summarizer
 from .collector import DEFAULT_CONFIG, Item, collect
+from .github_io import GitHubClient, collect_issue_feedback, publish_digest
 from .embedding import HashingEmbedder
 from .live import LiveState, SlateBuilder, load_policy, record_feedback, shortlist, start_day
 from .llm import default_llm
@@ -54,9 +56,10 @@ def cmd_daily(args) -> int:
 
     llm = None if args.offline else default_llm()
     summarizer = Summarizer(llm)
+    summaries = [summarizer.summarize(item) for item in picked]
     lines = [f"# Curio digest, {args.date}", ""]
-    for n, item in enumerate(picked, 1):
-        lines += [f"## {n}. {item.title}", f"*{item.source}* | {item.url}", "", summarizer.summarize(item), ""]
+    for n, (item, summary) in enumerate(zip(picked, summaries), 1):
+        lines += [f"## {n}. {item.title}", f"*{item.source}* | {item.url}", "", summary, ""]
     lines += ["---", "Give feedback with: `python -m curio.cli feedback --clicked 1 3` (item numbers), "
               "or `--clicked` with no numbers if you read none."]
     out = Path(args.out)
@@ -64,7 +67,7 @@ def cmd_daily(args) -> int:
     digest_path = out / f"{args.date}.md"
     digest_path.write_text("\n".join(lines) + "\n")
 
-    start_day(state, picked, picked_vecs)
+    start_day(state, picked, picked_vecs, summaries)
     state.save(args.state)
     print(f"Wrote {digest_path} ({'LLM' if llm else 'extractive'} summaries).")
     return 0
@@ -79,6 +82,47 @@ def cmd_feedback(args) -> int:
     ctr = record_feedback(state, ids, args.date)
     state.save(args.state)
     print(f"Recorded feedback: {len(ids)} clicked, CTR {ctr:.2f}, day {state.day}.")
+    return 0
+
+
+def make_client(args) -> GitHubClient:
+    token = os.environ.get("GITHUB_TOKEN")
+    repo = args.repo or os.environ.get("GITHUB_REPOSITORY")
+    if not token or not repo:
+        raise SystemExit("Set GITHUB_TOKEN and GITHUB_REPOSITORY (or pass --repo) to use GitHub feedback.")
+    return GitHubClient(repo, token)
+
+
+def _owner(args) -> str:
+    repo = args.repo or os.environ.get("GITHUB_REPOSITORY", "")
+    return args.feedback_user or os.environ.get("GITHUB_REPOSITORY_OWNER") or repo.split("/")[0]
+
+
+def cmd_publish(args) -> int:
+    state = LiveState.load(args.state)
+    if not state.pending:
+        print("No pending digest to publish. Run `daily` first.")
+        return 1
+    entries = [{**p["item"], "summary": p.get("summary", "")} for p in state.pending]
+    state.pending_issue = publish_digest(make_client(args), args.date, entries, _owner(args))
+    state.save(args.state)
+    print(f"Published issue #{state.pending_issue['number']} with {len(entries)} items.")
+    return 0
+
+
+def cmd_sync_feedback(args) -> int:
+    state = LiveState.load(args.state)
+    ref = state.pending_issue
+    if not state.pending or not ref:
+        print("No published digest awaiting feedback.")
+        return 0
+    client = make_client(args)
+    flags = collect_issue_feedback(client, ref["comment_ids"], _owner(args))
+    ids = {p["item"]["id"] for p, clicked in zip(state.pending, flags) if clicked}
+    ctr = record_feedback(state, ids, args.date)
+    state.save(args.state)  # save before closing so a failed close cannot lose feedback
+    client.close_issue(ref["number"])
+    print(f"Synced feedback from issue #{ref['number']}: {len(ids)} thumbs-up, CTR {ctr:.2f}, day {state.day}.")
     return 0
 
 
@@ -114,6 +158,14 @@ def build_parser() -> argparse.ArgumentParser:
     f = sub.add_parser("feedback", parents=[common], help="record which digest items you clicked")
     f.add_argument("--clicked", type=int, nargs="*", default=[], help="1-based item numbers")
     f.set_defaults(func=cmd_feedback)
+
+    gh = argparse.ArgumentParser(add_help=False)
+    gh.add_argument("--repo", help="owner/name (default: $GITHUB_REPOSITORY)")
+    gh.add_argument("--feedback-user", help="GitHub login whose reactions count (default: repo owner)")
+    p = sub.add_parser("publish", parents=[common, gh], help="post today's digest as a GitHub Issue")
+    p.set_defaults(func=cmd_publish)
+    sf = sub.add_parser("sync-feedback", parents=[common, gh], help="read thumbs-up reactions on the last digest")
+    sf.set_defaults(func=cmd_sync_feedback)
 
     r = sub.add_parser("reflect", parents=[common], help="write profile.md from recent feedback")
     r.add_argument("--profile", default="profile.md")

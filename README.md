@@ -46,7 +46,7 @@ sequential decision problem, which is exactly what RL is for.
 - [ ] More seeds for the follow-up (paused)
 - [x] Real feedback pipeline (CLI, file-based; GitHub Issue / Telegram feedback is next)
 - [x] LLM agents (collector, summarizer, reflector), untested against live APIs
-- [ ] GitHub Actions daily run
+- [x] GitHub Actions daily run and GitHub Issue reaction feedback (workflow not yet run on Actions)
 
 ## Getting started
 
@@ -293,6 +293,47 @@ Item text from the internet is treated as untrusted data in all prompts.
   digests contain near-duplicate topics. **There is no evaluation yet of how well the live
   ranking matches a real person's taste**; that needs real feedback over several weeks.
 - `models/curio_policy.pt` is the seed-0 checkpoint of the PPO run with similarity features.
+
+## Daily automation (GitHub Actions + Issue reactions)
+
+The workflow in `deploy/daily.yml` runs the whole loop once a day (04:00 UTC):
+
+1. `sync-feedback`: read your thumbs-up reactions on yesterday's digest issue, update the
+   policy's user state, close the issue.
+2. `daily`: collect, shortlist, pick the slate with the RL policy, summarize.
+3. `publish`: open a new issue "Curio digest YYYY-MM-DD" with **one comment per item**.
+4. On Sundays, `reflect` refreshes `profile.md`; then state and digests are committed.
+
+**Giving feedback:** put a thumbs-up on the comment of every item you want more of.
+Items without a thumbs-up count as ignored. Only reactions from the repository owner are
+counted (`--feedback-user` changes that), so strangers cannot steer the model on a public
+repo. Text from the internet is also stripped of `@mentions` before it is posted.
+
+**Setup**
+
+0. Copy `deploy/daily.yml` to `.github/workflows/daily.yml`. It is kept outside
+   `.github/` on purpose: GitHub refuses pushes that add workflow files unless the token
+   has the `workflow` scope, so the simplest way is the web UI (Add file > Create new
+   file > path `.github/workflows/daily.yml`, paste, commit) or a normal `git push` from
+   your own machine, where you are logged in with full permissions.
+1. Settings > Secrets and variables > Actions > **Variables**: add `CURIO_ENABLED` = `true`
+   (the workflow does nothing until you opt in).
+2. Optional: add the **secret** `ANTHROPIC_API_KEY` for LLM summaries and profiles.
+3. Actions tab > "Curio daily digest" > **Run workflow** once to test it.
+
+**Privacy warning:** the workflow commits `state/live_state.json` and `digest/`, which
+contain what you were shown and clicked. In a public repository that is your reading
+history. For personal use, run it in a **private copy** of this repository.
+
+**What is and is not verified**
+
+- Verified against the real GitHub API with a smoke test (create issue, comments,
+  owner reaction, read reactions, close): owner thumbs-up detected, other users ignored.
+  The remaining logic is covered by tests using an in-memory fake of the API.
+- `deploy/daily.yml` passes `actionlint`, but **it has never been executed on GitHub
+  Actions**. Expect to adjust it after the first run (for example Python/torch install time).
+- GitHub may pause scheduled workflows in repositories with no recent activity, and cron
+  start times can drift by several minutes.
 
 ## Running the tests
 

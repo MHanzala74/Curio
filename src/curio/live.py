@@ -42,7 +42,8 @@ class LiveState:
     last_day_ctr: float = 0.0
     total_clicks: int = 0
     total_shown: int = 0
-    pending: list = field(default_factory=list)       # [{"item": {...}, "vec": [...]}]
+    pending: list = field(default_factory=list)       # [{"item": {...}, "vec": [...], "summary": "..."}]
+    pending_issue: dict | None = None                 # {"number": int, "comment_ids": [int, ...]}
     feedback_log: list = field(default_factory=list)  # [{"date","id","title","source","clicked"}]
 
     def __post_init__(self) -> None:
@@ -148,8 +149,12 @@ class SlateBuilder:
         return chosen
 
 
-def start_day(state: LiveState, items: list[Item], vectors: np.ndarray) -> None:
-    state.pending = [{"item": it.to_dict(), "vec": np.asarray(v).tolist()} for it, v in zip(items, vectors)]
+def start_day(state: LiveState, items: list[Item], vectors: np.ndarray,
+              summaries: list[str] | None = None) -> None:
+    summaries = summaries or [""] * len(items)
+    state.pending = [{"item": it.to_dict(), "vec": np.asarray(v).tolist(), "summary": sm}
+                     for it, v, sm in zip(items, vectors, summaries)]
+    state.pending_issue = None
 
 
 def record_feedback(state: LiveState, clicked_ids: set[str], date: str) -> float:
@@ -166,5 +171,6 @@ def record_feedback(state: LiveState, clicked_ids: set[str], date: str) -> float
     if pending:
         state.end_day(ctr)
     state.pending = []
+    state.pending_issue = None
     state.feedback_log = state.feedback_log[-500:]
     return ctr

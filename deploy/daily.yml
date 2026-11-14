@@ -1,0 +1,67 @@
+name: Curio daily digest
+
+# Disabled until you opt in: set the repository variable CURIO_ENABLED to "true"
+# (Settings > Secrets and variables > Actions > Variables). Optionally add the secret
+# ANTHROPIC_API_KEY for LLM summaries. See the README section "Daily automation".
+on:
+  schedule:
+    - cron: "0 4 * * *"   # 04:00 UTC = 09:00 in Pakistan
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit state and digests
+  issues: write     # create the digest issue, read reactions
+
+concurrency:
+  group: curio-daily
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    if: ${{ vars.CURIO_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: src
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install numpy defusedxml anthropic
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      # Order matters: if reading feedback fails, the job stops before a new digest
+      # is built, so unread feedback is never silently counted as "ignored".
+      - name: Read thumbs-up reactions on the previous digest
+        run: python -m curio.cli sync-feedback
+
+      - name: Build today's digest
+        run: python -m curio.cli daily
+
+      - name: Publish the digest as an issue
+        run: python -m curio.cli publish
+
+      - name: Refresh the taste profile (Sundays)
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          if [ "$(date -u +%u)" = "7" ]; then python -m curio.cli reflect; fi
+
+      - name: Commit state and digests
+        run: |
+          git config user.name "curio-bot"
+          git config user.email "curio-bot@users.noreply.github.com"
+          git add state digest profile.md 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "chore: daily digest $(date -u +%F)"
+            git push
+          fi
