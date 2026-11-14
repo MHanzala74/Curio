@@ -20,7 +20,7 @@ from curio.baselines import (FatigueAwareLinUCBPolicy, LinUCBPolicy, OracleFatig
                              RandomPolicy)
 from curio.env_longterm import LongTermFeedEnv
 from curio.evaluate import run_policy, run_ppo
-from curio.training import train_ppo
+from curio.training import train_ppo, train_ppo_chunked
 
 VAL_SEEDS = [100, 101, 102]
 
@@ -57,10 +57,12 @@ def tune_fatigue_linucb() -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--variant", choices=["baselines", "ppo99", "ppo90"], required=True)
+    parser.add_argument("--variant", choices=["baselines", "ppo99", "ppo90", "ppo99dot"], required=True)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0])
     parser.add_argument("--updates", type=int, default=200)
     parser.add_argument("--episodes-per-update", type=int, default=64)
+    parser.add_argument("--total-updates", type=int, default=600)
+    parser.add_argument("--chunk", type=int, default=300)
     parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--eval-episodes", type=int, default=300)
     parser.add_argument("--out", type=str, default="docs/runs_long")
@@ -87,6 +89,17 @@ def main() -> None:
                 "oracle-lookahead": run_policy(OracleFatiguePolicy(3.0), args.eval_episodes, eval_seed, **kw),
             }
             payload = {"results": runs, "linucb_params": lin_params, "fatigue_linucb_params": fat_params}
+        elif args.variant == "ppo99dot":
+            ckpt = f"checkpoints/{args.variant}_seed{seed}.pt"
+            model, history, finished = train_ppo_chunked(
+                seed, args.total_updates, args.episodes_per_update, args.chunk, ckpt,
+                lr=args.lr, gamma=0.99, model_kwargs=dict(dot_features=True), **kw)
+            if not finished:
+                print(f"seed {seed}: chunk done ({len(history)}/{args.total_updates} updates); run again to continue", flush=True)
+                continue
+            label = "ppo (dot features, long training)"
+            payload = {"results": {label: run_ppo(model, args.eval_episodes, eval_seed, **kw)},
+                       "train_curve": [h["train_return"] for h in history]}
         else:
             gamma = 0.99 if args.variant == "ppo99" else 0.9
             model, history = train_ppo(seed, args.updates, args.episodes_per_update, log_every=50,

@@ -41,3 +41,26 @@ def test_update_changes_parameters():
     after = list(model.parameters())
     assert any(not np.allclose(b.numpy(), a.detach().numpy()) for b, a in zip(before, after))
     assert set(stats) == {"policy_loss", "value_loss", "entropy"}
+
+
+def test_dot_features_forward_and_masking_on_long_env():
+    import torch
+
+    from curio.env_longterm import LongTermFeedEnv
+
+    env = LongTermFeedEnv(seed=0)
+    obs, _ = env.reset()
+    model = ActorCritic(env.pool_size, env.dim, n_summaries=env.N_SUMMARIES,
+                        n_scalars=env.N_SCALARS, dot_features=True)
+    logits, value = model(torch.as_tensor(obs).unsqueeze(0))
+    assert logits.shape == (1, env.pool_size) and value.shape == (1,)
+
+
+def test_chunked_training_resumes_from_checkpoint(tmp_path):
+    from curio.training import train_ppo_chunked
+
+    ckpt = str(tmp_path / "ck.pt")
+    _, hist1, finished1 = train_ppo_chunked(0, 2, 4, 1, ckpt, log_every=0)
+    assert len(hist1) == 1 and not finished1
+    _, hist2, finished2 = train_ppo_chunked(0, 2, 4, 1, ckpt, log_every=0)
+    assert len(hist2) == 2 and finished2

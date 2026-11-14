@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.distributions import Categorical
 
 
@@ -21,14 +22,18 @@ class ActorCritic(nn.Module):
     """
 
     def __init__(self, pool_size: int, dim: int, hidden: int = 64,
-                 n_summaries: int = 4, n_scalars: int = 0) -> None:
+                 n_summaries: int = 4, n_scalars: int = 0, dot_features: bool = False) -> None:
         super().__init__()
         self.pool_size, self.dim = pool_size, dim
         self.n_summaries, self.n_scalars = n_summaries, n_scalars
+        # Optional explicit similarity features: item . summary and relu(item . summary).
+        # These make terms like max(0, item . exposure) easy to represent.
+        self.dot_features = dot_features
+        extra = 2 * n_summaries if dot_features else 0
         # Per-item features: summaries, the item, item * each summary, scalars,
         # and an availability flag.
         self.scorer = nn.Sequential(
-            nn.Linear((2 * n_summaries + 1) * dim + n_scalars + 1, hidden), nn.Tanh(),
+            nn.Linear((2 * n_summaries + 1) * dim + n_scalars + 1 + extra, hidden), nn.Tanh(),
             nn.Linear(hidden, hidden), nn.Tanh(),
             nn.Linear(hidden, 1),
         )
@@ -51,7 +56,11 @@ class ActorCritic(nn.Module):
         n = self.pool_size
         s = [summaries[:, i].unsqueeze(1).expand(-1, n, -1) for i in range(self.n_summaries)]
         sc = scalars.unsqueeze(1).expand(-1, n, -1)
-        feats = torch.cat(s + [pool] + [x * pool for x in s] + [sc, avail.unsqueeze(-1)], dim=-1)
+        parts = s + [pool] + [x * pool for x in s] + [sc, avail.unsqueeze(-1)]
+        if self.dot_features:
+            dots = (pool.unsqueeze(2) * summaries.unsqueeze(1)).sum(-1)  # (b, n, k)
+            parts += [dots, F.relu(dots)]
+        feats = torch.cat(parts, dim=-1)
         logits = self.scorer(feats).squeeze(-1)
         logits = logits.masked_fill(avail < 0.5, -1e9)
 
