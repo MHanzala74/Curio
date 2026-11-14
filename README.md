@@ -79,7 +79,7 @@ number of seeds. Earlier results remain reproducible via the tag
 git clone https://github.com/MHanzala74/Curio && cd Curio
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-PYTHONPATH=src pytest -q                              # 50 tests
+PYTHONPATH=src pytest -q                              # 52 tests
 
 # Live pipeline demo, offline, with bundled synthetic items:
 export PYTHONPATH=src
@@ -358,9 +358,14 @@ history. For personal use, run it in a **private copy** of this repository.
 
 **What is and is not verified**
 
-- Verified against the real GitHub API with a smoke test (create issue, comments,
-  owner reaction, read reactions, close): owner thumbs-up detected, other users ignored.
-  The remaining logic is covered by tests using an in-memory fake of the API.
+- Verified against the real GitHub API: a smoke test (create issue, comments, owner
+  reaction, read reactions, close) and a rehearsal of the workflow's CLI sequence
+  (`sync-feedback`, `daily --demo`, `publish`, reaction, `sync-feedback`) with the same
+  environment variables the workflow uses. Owner thumbs-up is detected, other users are
+  ignored. The remaining logic is covered by tests using an in-memory fake of the API.
+- The commit step lives in `deploy/commit_state.sh` and has regression tests in a real git
+  repository. An earlier version of the workflow silently committed nothing until
+  `profile.md` existed; that bug was found by inspection and fixed.
 - `deploy/daily.yml` passes `actionlint`, but **it has never been executed on GitHub
   Actions**. Expect to adjust it after the first run (for example Python/torch install time).
 - GitHub may pause scheduled workflows in repositories with no recent activity, and cron
@@ -400,7 +405,7 @@ models/curio_policy.pt        trained policy weights (seed-0 PPO run)
 deploy/daily.yml              GitHub Actions workflow template
 docs/                         result tables, plots, per-seed run files
 *.py (repo root)              experiment scripts: multi_seed, personalization, long_horizon, ...
-tests/                        50 tests
+tests/                        52 tests
 ```
 
 ## Roadmap
