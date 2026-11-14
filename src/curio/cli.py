@@ -1,4 +1,4 @@
-"""Command line interface: ``python -m curio.cli {daily,feedback,reflect}``."""
+"""Command line interface: ``python -m curio.cli {daily,publish,sync-feedback,feedback,reflect}``."""
 
 from __future__ import annotations
 

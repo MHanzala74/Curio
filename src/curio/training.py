@@ -74,7 +74,7 @@ def train_ppo_chunked(seed: int, total_updates: int, episodes_per_update: int, c
     ppo = PPO(model, PPOConfig(lr=lr, gamma=gamma))
     history, done_updates = [], 0
     if os.path.exists(ckpt_path):
-        state = torch.load(ckpt_path, weights_only=False)
+        state = torch.load(ckpt_path, weights_only=True)
         model.load_state_dict(state["model"])
         ppo.opt.load_state_dict(state["opt"])
         history, done_updates = state["history"], state["updates"]

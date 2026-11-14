@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from urllib.parse import parse_qs
 
 import numpy as np
 
@@ -19,7 +20,8 @@ class FakeGitHub:
 
     def transport(self, method, url, headers, data):
         assert headers["Authorization"] == "Bearer tok"
-        path = url.split("https://api.github.com")[1].split("?")[0]
+        path, _, query = url.split("https://api.github.com")[1].partition("?")
+        params = parse_qs(query)
         body = json.loads(data) if data else None
         self.calls.append((method, path))
         parts = path.strip("/").split("/")  # repos/o/r/issues[/n[/comments]] | issues/comments/id/reactions
@@ -35,7 +37,12 @@ class FakeGitHub:
             self.comments[cid] = body["body"]
             return 201, json.dumps({"id": cid}).encode()
         if method == "GET" and parts[-1] == "reactions":
-            return 200, json.dumps(self.reaction_map.get(int(parts[-2]), [])).encode()
+            items = self.reaction_map.get(int(parts[-2]), [])
+            if "content" in params:
+                items = [r for r in items if r["content"] == params["content"][0]]
+            per_page = int(params.get("per_page", ["30"])[0])
+            page = int(params.get("page", ["1"])[0])
+            return 200, json.dumps(items[(page - 1) * per_page: page * per_page]).encode()
         if method == "PATCH" and parts[3] == "issues":
             self.issues[int(parts[4])]["state"] = body["state"]
             return 200, b"{}"
@@ -113,3 +120,21 @@ def test_cli_publish_then_sync_feedback_roundtrip(tmp_path, monkeypatch):
 def test_publish_without_pending_digest_fails_cleanly(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "make_client", lambda args: FakeGitHub().client())
     assert cli.main(["publish", "--state", str(tmp_path / "s.json")]) == 1
+
+
+def test_owner_reaction_is_found_even_when_buried_behind_many_strangers():
+    """Regression: with no pagination an owner reaction on page 2+ would be missed."""
+    gh = FakeGitHub()
+    for i in range(130):
+        gh.react(1, f"stranger{i}")
+    gh.react(1, "owner")  # the 131st thumbs-up
+    assert collect_issue_feedback(gh.client(), [1], "owner") == [True]
+    pages = [c for c in gh.calls if c[1].endswith("/reactions")]
+    assert len(pages) == 2  # page 1 (full) and page 2 (short), then it stops
+
+
+def test_reaction_pagination_is_bounded():
+    gh = FakeGitHub()
+    for i in range(250):
+        gh.react(1, f"u{i}")
+    assert len(gh.client().reactions(1, max_pages=2)) == 200

@@ -12,6 +12,7 @@ import json
 import urllib.error
 import urllib.request
 from typing import Callable
+from urllib.parse import quote
 
 API = "https://api.github.com"
 Transport = Callable[[str, str, dict, bytes | None], tuple[int, bytes]]
@@ -55,8 +56,24 @@ class GitHubClient:
     def add_comment(self, issue: int, body: str) -> int:
         return self._call("POST", f"/repos/{self.repo}/issues/{issue}/comments", {"body": body})["id"]
 
-    def reactions(self, comment_id: int) -> list[dict]:
-        return self._call("GET", f"/repos/{self.repo}/issues/comments/{comment_id}/reactions?per_page=100")
+    def reactions(self, comment_id: int, content: str = "+1", max_pages: int = 10) -> list[dict]:
+        """Thumbs-up reactions on a comment, following pagination (100 per page).
+
+        Without pagination, a crowd of strangers' reactions on a public repository could push
+        the owner's reaction onto a later page and make it invisible. ``max_pages`` bounds the
+        work at 1000 reactions per comment.
+        """
+        collected: list[dict] = []
+        for page in range(1, max_pages + 1):
+            batch = self._call(
+                "GET",
+                f"/repos/{self.repo}/issues/comments/{comment_id}/reactions"
+                f"?content={quote(content)}&per_page=100&page={page}",
+            )
+            collected.extend(batch)
+            if len(batch) < 100:
+                break
+        return collected
 
     def close_issue(self, issue: int) -> None:
         self._call("PATCH", f"/repos/{self.repo}/issues/{issue}", {"state": "closed"})

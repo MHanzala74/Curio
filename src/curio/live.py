@@ -84,7 +84,7 @@ class LiveState:
 
 
 def load_policy(path: str | Path) -> ActorCritic:
-    blob = torch.load(path, weights_only=False)
+    blob = torch.load(path, weights_only=True)  # tensors and plain data only; no pickle code
     model = ActorCritic(**blob["config"])
     model.load_state_dict(blob["state_dict"])
     model.eval()
