@@ -1,65 +1,96 @@
 # Curio
 
-**An AI feed curator that learns your taste.**
+**A multi-agent feed curator that learns your taste with reinforcement learning, and an honest study of when RL actually helps.**
 
-A multi-agent news feed curator that learns **your** taste using real
-reinforcement learning (PPO actor-critic), not just a bandit.
+Curio collects papers and articles every day, picks a small slate with a PPO actor-critic
+policy, summarizes it with an LLM agent, and learns from your thumbs-up reactions. The
+repository contains both the working pipeline and a simulation study that tests whether
+RL is really better than a well-tuned contextual bandit for this task.
 
-> Status: early development. Built in small steps, one commit at a time.
+> **Status: research prototype.** The RL study is complete and reproducible. The live
+> pipeline is tested offline and against the real GitHub API, but has **not yet been run
+> against live arXiv / Hacker News / Anthropic APIs or on GitHub Actions** (see
+> [Limitations](#limitations)).
 
-## Idea
+## Architecture
 
-Every day the system collects many candidate items (papers, blog posts,
-repos), picks a small slate to show you, and learns from how you react.
-Because what we show today shapes your interests tomorrow, this is a
-sequential decision problem, which is exactly what RL is for.
-
-## MDP formulation
-
-| Element    | Definition                                                                 |
-|------------|----------------------------------------------------------------------------|
-| State      | User interest vector, recent history summary, candidate pool features      |
-| Action     | Pick one candidate item at a time until the slate is full (slate building) |
-| Reward     | Engagement (click, read time) + novelty bonus - redundancy penalty         |
-| Transition | The user's interests drift toward what they were shown and liked           |
-| Discount   | gamma = 0.9, so long-term satisfaction matters, not just instant clicks    |
-
-## Planned architecture
-
-- **Collector agent**: fetches candidate items from several sources
-- **Simulated user**: used to pretrain the policy with thousands of episodes
-- **Policy (PPO actor-critic)**: decides which items to show
-- **Summarizer agent**: writes short summaries for the chosen items
-- **Reflector agent**: writes a weekly natural-language profile of your taste
-
-## Roadmap
-
-- [x] Project scaffold
-- [x] Gymnasium environment and simulated user
-- [x] PPO implementation (PyTorch) and baselines (random, greedy, bandit)
-- [x] Learning curves and multi-seed comparison (5 seeds, mean ± std)
-- [x] Expose click feedback in the observation so the policy can personalize (partial success, see below)
-- [x] Tuned LinUCB baseline and belief-state PPO variant
-- [x] Longer-horizon task with fatigue and churn
-- [x] Fatigue-aware bandit baseline (it beats PPO at the current training budget)
-- [x] Longer PPO training with similarity features (ties the bandit, 2 seeds)
-- [ ] More seeds for the follow-up (paused)
-- [x] Real feedback pipeline (CLI, file-based; GitHub Issue / Telegram feedback is next)
-- [x] LLM agents (collector, summarizer, reflector), untested against live APIs
-- [x] GitHub Actions daily run and GitHub Issue reaction feedback (workflow not yet run on Actions)
-
-## Getting started
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+```mermaid
+flowchart LR
+    subgraph Sources
+        A["arXiv"]
+        H["Hacker News"]
+        R["RSS / Atom"]
+    end
+    A --> C
+    H --> C
+    R --> C
+    C["Collector agent"] --> E["Embedder (8-dim)"]
+    E --> P["RL policy: PPO actor-critic"]
+    S[("User state: exposure, belief, click history")] --> P
+    P --> M["Summarizer agent (LLM)"]
+    M --> I["GitHub Issue digest, one comment per item"]
+    I -->|"thumbs-up from the owner"| F["Feedback"]
+    F --> S
+    F --> X["Reflector agent (LLM)"]
+    X --> PR["profile.md"]
 ```
 
-## License
+**The decision problem (MDP) used for training** (`curio.env_longterm.LongTermFeedEnv`):
 
-MIT
+| Element | Definition |
+|---|---|
+| State | Exposure to recent items, clicked/skipped history, a running belief about the user's interest, day-level CTR history, and the 30 candidate items |
+| Action | Pick one candidate at a time until the day's slate (5 items) is full |
+| Reward | Clicks only |
+| Transition | Showing similar items causes fatigue that carries across days; interest drifts toward clicked items; the user **churns** (episode ends) if satisfaction drops too low |
+| Discount | gamma = 0.99 over a 7-day horizon |
 
-## Results (simulated user, 5 seeds)
+## Key findings
+
+All numbers are means over 3 seeds unless stated, evaluated on simulated users the
+policy never saw in training. Details, tables and plots are under
+[Experiments in detail](#experiments-in-detail).
+
+| # | Setting | Result |
+|---|---|---|
+| 1 | One-day slates, no click feedback (5 seeds) | PPO 4.77 vs LinUCB 4.44 vs random 3.45. PPO won on all seeds, but it had learned a **user-agnostic diversity strategy**, not personalization. |
+| 2 | New user every episode, click feedback | Click feedback helps PPO, but a **tuned LinUCB ties it** (6.92 vs 6.97). An earlier "PPO wins" claim came from an untuned baseline and was corrected. |
+| 3 | 7-day horizon with fatigue and churn | PPO (8.4 clicks) beats a fatigue-unaware bandit (5.7), but a **fatigue-aware bandit scores 11.7**. The "RL win" was largely an information gap. |
+| 4 | Same task, PPO with similarity features and longer training (2 seeds, preliminary) | 11.8 vs 11.9 for the fatigue-aware bandit on the same seeds: **roughly a tie**. Oracle ceiling is about 14.8. |
+
+**Take-away.** In these simulators RL is competitive with a well-tuned, well-informed
+bandit, but no setting showed it clearly winning. The RL advantages seen early on were
+explained by the baselines lacking information (novelty, click feedback, fatigue) or
+tuning, and there was no sign of a benefit from long-horizon planning: changing the
+discount from 0.9 to 0.99 made no difference, and a lookahead oracle was barely better
+than a myopic one. This does not prove RL cannot win; harder or longer-horizon
+settings remain untested. Corrected results are documented in the git history rather
+than hidden.
+
+**Method notes.** Baselines are tuned on separate validation seeds (never the evaluation
+seeds), with grid search extended until the optimum is interior. Methods are compared on
+identical evaluation users per seed with paired differences, and each claim lists the
+number of seeds. Earlier results remain reproducible via the tag
+`v0.1-no-click-feedback`.
+
+## Quick start
+
+```bash
+git clone https://github.com/MHanzala74/Curio && cd Curio
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+PYTHONPATH=src pytest -q                              # 50 tests
+
+# Live pipeline demo, offline, with bundled synthetic items:
+export PYTHONPATH=src
+python -m curio.cli daily --demo --offline
+python -m curio.cli feedback --clicked 1 3
+python -m curio.cli reflect --offline
+```
+
+## Experiments in detail
+
+### Results (simulated user, 5 seeds)
 
 ![Learning curve over 5 seeds](docs/multi_seed_curve.png)
 
@@ -81,7 +112,7 @@ Reproduce with:
 PYTHONPATH=src python multi_seed.py --seeds 5
 ```
 
-### What PPO actually learned (important)
+#### What PPO actually learned (important)
 
 PPO beats the greedy baselines on all 5 seeds, but the reason is **not
 personalization**. In the current environment the observation only contains the
@@ -103,7 +134,7 @@ sequential effect, but it is a user-agnostic one.
 - The follow-up experiment below adds click feedback to the observation.
 - These results were produced with the code at tag `v0.1-no-click-feedback`.
 
-## Personalization experiment
+### Personalization experiment
 
 ![Personalization results](docs/personalization.png)
 
@@ -168,7 +199,7 @@ matters mostly through diversity and boredom, and a tuned contextual bandit
 captures most of the achievable gain with very little data. A fairer test of RL's
 advantage needs longer horizons, where today's choices change later states more.
 
-## Long-horizon experiment (fatigue and churn)
+### Long-horizon experiment (fatigue and churn)
 
 ![Long-horizon results](docs/long_horizon.png)
 
@@ -237,7 +268,7 @@ python aggregate_long.py
 - Three seeds, one simulator with hand-chosen constants.
 
 
-### Follow-up: giving PPO a fair second chance (preliminary, 2 seeds)
+#### Follow-up: giving PPO a fair second chance (preliminary, 2 seeds)
 
 PPO was retrained for 400 updates with explicit similarity features
 (`item . summary` and its ReLU, which make terms like `max(0, item . exposure)` easy
@@ -335,8 +366,61 @@ history. For personal use, run it in a **private copy** of this repository.
 - GitHub may pause scheduled workflows in repositories with no recent activity, and cron
   start times can drift by several minutes.
 
+## Limitations
+
+- **Simulation only for the RL claims.** The simulated user is simple and its constants
+  (fatigue, drift, churn threshold) were chosen by hand. Results say little about how a
+  real person behaves.
+- **Small number of seeds** (3, and 2 for the last follow-up), so standard deviations are
+  rough and small gaps are not meaningful.
+- **Sim-to-real gap in the live pipeline.** The policy was trained on 8-dimensional
+  synthetic items; real text is mapped to 8 dimensions with a crude hashing embedder, and
+  daily slates are built open loop (no click feedback between items of one digest).
+- **No evaluation with real feedback yet.** Whether the live ranking matches a real
+  person's taste needs several weeks of actual use.
+- **Untested integrations.** The arXiv, Hacker News and Anthropic API calls and the GitHub
+  Actions workflow have not been run end to end; the GitHub Issues feedback loop was
+  verified with a real smoke test and an in-memory fake.
+- **Privacy.** The daily workflow commits your click history. Run it in a private copy.
+
+## Project layout
+
+```
+src/curio/
+  env.py, env_longterm.py     simulation environments (one-day and 7-day with churn)
+  simulated_user.py           drifting user model for the one-day environment
+  ppo.py, training.py         PPO actor-critic from scratch, chunked/resumable training
+  baselines.py, evaluate.py   random, oracles, LinUCB (tuned, fatigue-aware), evaluation
+  collector.py                Collector agent: arXiv, Hacker News, RSS/Atom
+  embedding.py                hashing and sentence-transformer embedders
+  agents.py, llm.py           Summarizer and Reflector agents, LLM client
+  live.py, github_io.py       live user state, slate builder, GitHub Issue feedback
+  cli.py                      daily / publish / sync-feedback / feedback / reflect
+models/curio_policy.pt        trained policy weights (seed-0 PPO run)
+deploy/daily.yml              GitHub Actions workflow template
+docs/                         result tables, plots, per-seed run files
+*.py (repo root)              experiment scripts: multi_seed, personalization, long_horizon, ...
+tests/                        50 tests
+```
+
+## Roadmap
+
+- [x] Simulator, PPO from scratch, baselines, multi-seed evaluation
+- [x] Personalization and long-horizon studies with tuned, fair baselines
+- [x] Collector, Summarizer and Reflector agents; live slate builder and CLI
+- [x] GitHub Issue reaction feedback and a daily workflow template
+- [ ] First real run against live APIs and on GitHub Actions
+- [ ] Several weeks of real feedback to evaluate the live ranking
+- [ ] Better item embeddings and a policy retrained on realistic features
+- [ ] Closed-loop feedback per item, or retraining on logged real feedback
+- [ ] More seeds for the PPO-vs-bandit follow-up
+
 ## Running the tests
 
 ```bash
 PYTHONPATH=src pytest -q
 ```
+
+## License
+
+MIT
