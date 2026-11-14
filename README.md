@@ -42,7 +42,8 @@ sequential decision problem, which is exactly what RL is for.
 - [x] Tuned LinUCB baseline and belief-state PPO variant
 - [x] Longer-horizon task with fatigue and churn
 - [x] Fatigue-aware bandit baseline (it beats PPO at the current training budget)
-- [ ] Longer PPO training / better architecture, more seeds
+- [x] Longer PPO training with similarity features (ties the bandit, 2 seeds)
+- [ ] More seeds for the follow-up (paused)
 - [ ] Real feedback pipeline
 - [ ] LLM agents (collector, summarizer, reflector)
 - [ ] GitHub Actions daily run
@@ -234,6 +235,24 @@ python aggregate_long.py
   yet, so the result is "PPO at this training budget loses to a good heuristic",
   not "RL cannot win here".
 - Three seeds, one simulator with hand-chosen constants.
+
+
+### Follow-up: giving PPO a fair second chance (preliminary, 2 seeds)
+
+PPO was retrained for 400 updates with explicit similarity features
+(`item . summary` and its ReLU, which make terms like `max(0, item . exposure)` easy
+to represent; `ActorCritic(dot_features=True)`). Long runs use checkpoint/resume
+(`train_ppo_chunked`) to fit tool time limits.
+
+| Seed | PPO (dot features, 400 updates) | LinUCB (fatigue-aware) |
+|---|---|---|
+| 0 | 11.49 | 11.65 |
+| 1 | 12.04 | 12.06 |
+
+With the right features and more training, PPO goes from 8.4 to roughly the level of
+the tuned fatigue-aware bandit. Only 2 seeds were run, so this is preliminary: it
+shows the earlier gap was largely about features and training budget, not that PPO
+beats the bandit. The research track is paused here to build the live pipeline.
 
 ## Running the tests
 
