@@ -1,0 +1,322 @@
+[
+ {
+  "id": "sample:1",
+  "title": "[SAMPLE] Gradient agents learning reinforcement",
+  "summary": "This synthetic item is about gradient and agents. It mentions learning, reinforcement and reward.",
+  "source": "sample",
+  "url": "https://example.com/sample/1",
+  "published": ""
+ },
+ {
+  "id": "sample:2",
+  "title": "[SAMPLE] Tokens language model inference",
+  "summary": "This synthetic item is about tokens and language. It mentions model, inference and transformer.",
+  "source": "sample",
+  "url": "https://example.com/sample/2",
+  "published": ""
+ },
+ {
+  "id": "sample:3",
+  "title": "[SAMPLE] Defense encryption vulnerability malware",
+  "summary": "This synthetic item is about defense and encryption. It mentions vulnerability, malware and exploit.",
+  "source": "sample",
+  "url": "https://example.com/sample/3",
+  "published": ""
+ },
+ {
+  "id": "sample:4",
+  "title": "[SAMPLE] Storage database planner index",
+  "summary": "This synthetic item is about storage and database. It mentions planner, index and latency.",
+  "source": "sample",
+  "url": "https://example.com/sample/4",
+  "published": ""
+ },
+ {
+  "id": "sample:5",
+  "title": "[SAMPLE] Control locomotion manipulation sensors",
+  "summary": "This synthetic item is about control and locomotion. It mentions manipulation, sensors and robot.",
+  "source": "sample",
+  "url": "https://example.com/sample/5",
+  "published": ""
+ },
+ {
+  "id": "sample:6",
+  "title": "[SAMPLE] Segmentation image camera dataset",
+  "summary": "This synthetic item is about segmentation and image. It mentions camera, dataset and convolution.",
+  "source": "sample",
+  "url": "https://example.com/sample/6",
+  "published": ""
+ },
+ {
+  "id": "sample:7",
+  "title": "[SAMPLE] Compiler kernel scheduler throughput",
+  "summary": "This synthetic item is about compiler and kernel. It mentions scheduler, throughput and memory.",
+  "source": "sample",
+  "url": "https://example.com/sample/7",
+  "published": ""
+ },
+ {
+  "id": "sample:8",
+  "title": "[SAMPLE] Sequencing genome cell molecule",
+  "summary": "This synthetic item is about sequencing and genome. It mentions cell, molecule and drug.",
+  "source": "sample",
+  "url": "https://example.com/sample/8",
+  "published": ""
+ },
+ {
+  "id": "sample:9",
+  "title": "[SAMPLE] Agents gradient learning policy",
+  "summary": "This synthetic item is about agents and gradient. It mentions learning, policy and reinforcement.",
+  "source": "sample",
+  "url": "https://example.com/sample/9",
+  "published": ""
+ },
+ {
+  "id": "sample:10",
+  "title": "[SAMPLE] Model tokens pretraining language",
+  "summary": "This synthetic item is about model and tokens. It mentions pretraining, language and transformer.",
+  "source": "sample",
+  "url": "https://example.com/sample/10",
+  "published": ""
+ },
+ {
+  "id": "sample:11",
+  "title": "[SAMPLE] Attack malware vulnerability encryption",
+  "summary": "This synthetic item is about attack and malware. It mentions vulnerability, encryption and defense.",
+  "source": "sample",
+  "url": "https://example.com/sample/11",
+  "published": ""
+ },
+ {
+  "id": "sample:12",
+  "title": "[SAMPLE] Storage latency index database",
+  "summary": "This synthetic item is about storage and latency. It mentions index, database and planner.",
+  "source": "sample",
+  "url": "https://example.com/sample/12",
+  "published": ""
+ },
+ {
+  "id": "sample:13",
+  "title": "[SAMPLE] Manipulation locomotion control sensors",
+  "summary": "This synthetic item is about manipulation and locomotion. It mentions control, sensors and robot.",
+  "source": "sample",
+  "url": "https://example.com/sample/13",
+  "published": ""
+ },
+ {
+  "id": "sample:14",
+  "title": "[SAMPLE] Convolution image segmentation detection",
+  "summary": "This synthetic item is about convolution and image. It mentions segmentation, detection and dataset.",
+  "source": "sample",
+  "url": "https://example.com/sample/14",
+  "published": ""
+ },
+ {
+  "id": "sample:15",
+  "title": "[SAMPLE] Kernel compiler throughput scheduler",
+  "summary": "This synthetic item is about kernel and compiler. It mentions throughput, scheduler and memory.",
+  "source": "sample",
+  "url": "https://example.com/sample/15",
+  "published": ""
+ },
+ {
+  "id": "sample:16",
+  "title": "[SAMPLE] Cell molecule protein drug",
+  "summary": "This synthetic item is about cell and molecule. It mentions protein, drug and genome.",
+  "source": "sample",
+  "url": "https://example.com/sample/16",
+  "published": ""
+ },
+ {
+  "id": "sample:17",
+  "title": "[SAMPLE] Learning exploration reinforcement policy",
+  "summary": "This synthetic item is about learning and exploration. It mentions reinforcement, policy and agents.",
+  "source": "sample",
+  "url": "https://example.com/sample/17",
+  "published": ""
+ },
+ {
+  "id": "sample:18",
+  "title": "[SAMPLE] Pretraining transformer language tokens",
+  "summary": "This synthetic item is about pretraining and transformer. It mentions language, tokens and model.",
+  "source": "sample",
+  "url": "https://example.com/sample/18",
+  "published": ""
+ },
+ {
+  "id": "sample:19",
+  "title": "[SAMPLE] Vulnerability exploit malware encryption",
+  "summary": "This synthetic item is about vulnerability and exploit. It mentions malware, encryption and attack.",
+  "source": "sample",
+  "url": "https://example.com/sample/19",
+  "published": ""
+ },
+ {
+  "id": "sample:20",
+  "title": "[SAMPLE] Database latency query planner",
+  "summary": "This synthetic item is about database and latency. It mentions query, planner and storage.",
+  "source": "sample",
+  "url": "https://example.com/sample/20",
+  "published": ""
+ },
+ {
+  "id": "sample:21",
+  "title": "[SAMPLE] Locomotion manipulation robot sensors",
+  "summary": "This synthetic item is about locomotion and manipulation. It mentions robot, sensors and simulation.",
+  "source": "sample",
+  "url": "https://example.com/sample/21",
+  "published": ""
+ },
+ {
+  "id": "sample:22",
+  "title": "[SAMPLE] Dataset segmentation detection convolution",
+  "summary": "This synthetic item is about dataset and segmentation. It mentions detection, convolution and image.",
+  "source": "sample",
+  "url": "https://example.com/sample/22",
+  "published": ""
+ },
+ {
+  "id": "sample:23",
+  "title": "[SAMPLE] Memory cache scheduler compiler",
+  "summary": "This synthetic item is about memory and cache. It mentions scheduler, compiler and throughput.",
+  "source": "sample",
+  "url": "https://example.com/sample/23",
+  "published": ""
+ },
+ {
+  "id": "sample:24",
+  "title": "[SAMPLE] Cell drug molecule sequencing",
+  "summary": "This synthetic item is about cell and drug. It mentions molecule, sequencing and genome.",
+  "source": "sample",
+  "url": "https://example.com/sample/24",
+  "published": ""
+ },
+ {
+  "id": "sample:25",
+  "title": "[SAMPLE] Exploration gradient agents learning",
+  "summary": "This synthetic item is about exploration and gradient. It mentions agents, learning and reward.",
+  "source": "sample",
+  "url": "https://example.com/sample/25",
+  "published": ""
+ },
+ {
+  "id": "sample:26",
+  "title": "[SAMPLE] Model transformer pretraining inference",
+  "summary": "This synthetic item is about model and transformer. It mentions pretraining, inference and tokens.",
+  "source": "sample",
+  "url": "https://example.com/sample/26",
+  "published": ""
+ },
+ {
+  "id": "sample:27",
+  "title": "[SAMPLE] Malware encryption attack vulnerability",
+  "summary": "This synthetic item is about malware and encryption. It mentions attack, vulnerability and exploit.",
+  "source": "sample",
+  "url": "https://example.com/sample/27",
+  "published": ""
+ },
+ {
+  "id": "sample:28",
+  "title": "[SAMPLE] Index latency planner transactions",
+  "summary": "This synthetic item is about index and latency. It mentions planner, transactions and storage.",
+  "source": "sample",
+  "url": "https://example.com/sample/28",
+  "published": ""
+ },
+ {
+  "id": "sample:29",
+  "title": "[SAMPLE] Manipulation sensors locomotion control",
+  "summary": "This synthetic item is about manipulation and sensors. It mentions locomotion, control and robot.",
+  "source": "sample",
+  "url": "https://example.com/sample/29",
+  "published": ""
+ },
+ {
+  "id": "sample:30",
+  "title": "[SAMPLE] Segmentation camera detection convolution",
+  "summary": "This synthetic item is about segmentation and camera. It mentions detection, convolution and image.",
+  "source": "sample",
+  "url": "https://example.com/sample/30",
+  "published": ""
+ },
+ {
+  "id": "sample:31",
+  "title": "[SAMPLE] Throughput memory cache kernel",
+  "summary": "This synthetic item is about throughput and memory. It mentions cache, kernel and compiler.",
+  "source": "sample",
+  "url": "https://example.com/sample/31",
+  "published": ""
+ },
+ {
+  "id": "sample:32",
+  "title": "[SAMPLE] Molecule drug protein genome",
+  "summary": "This synthetic item is about molecule and drug. It mentions protein, genome and cell.",
+  "source": "sample",
+  "url": "https://example.com/sample/32",
+  "published": ""
+ },
+ {
+  "id": "sample:33",
+  "title": "[SAMPLE] Agents learning reward policy",
+  "summary": "This synthetic item is about agents and learning. It mentions reward, policy and exploration.",
+  "source": "sample",
+  "url": "https://example.com/sample/33",
+  "published": ""
+ },
+ {
+  "id": "sample:34",
+  "title": "[SAMPLE] Tokens language inference model",
+  "summary": "This synthetic item is about tokens and language. It mentions inference, model and pretraining.",
+  "source": "sample",
+  "url": "https://example.com/sample/34",
+  "published": ""
+ },
+ {
+  "id": "sample:35",
+  "title": "[SAMPLE] Defense malware encryption attack",
+  "summary": "This synthetic item is about defense and malware. It mentions encryption, attack and exploit.",
+  "source": "sample",
+  "url": "https://example.com/sample/35",
+  "published": ""
+ },
+ {
+  "id": "sample:36",
+  "title": "[SAMPLE] Query storage latency index",
+  "summary": "This synthetic item is about query and storage. It mentions latency, index and planner.",
+  "source": "sample",
+  "url": "https://example.com/sample/36",
+  "published": ""
+ },
+ {
+  "id": "sample:37",
+  "title": "[SAMPLE] Robot manipulation locomotion sensors",
+  "summary": "This synthetic item is about robot and manipulation. It mentions locomotion, sensors and control.",
+  "source": "sample",
+  "url": "https://example.com/sample/37",
+  "published": ""
+ },
+ {
+  "id": "sample:38",
+  "title": "[SAMPLE] Dataset image camera segmentation",
+  "summary": "This synthetic item is about dataset and image. It mentions camera, segmentation and detection.",
+  "source": "sample",
+  "url": "https://example.com/sample/38",
+  "published": ""
+ },
+ {
+  "id": "sample:39",
+  "title": "[SAMPLE] Kernel cache throughput scheduler",
+  "summary": "This synthetic item is about kernel and cache. It mentions throughput, scheduler and compiler.",
+  "source": "sample",
+  "url": "https://example.com/sample/39",
+  "published": ""
+ },
+ {
+  "id": "sample:40",
+  "title": "[SAMPLE] Molecule cell protein genome",
+  "summary": "This synthetic item is about molecule and cell. It mentions protein, genome and sequencing.",
+  "source": "sample",
+  "url": "https://example.com/sample/40",
+  "published": ""
+ }
+]

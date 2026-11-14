@@ -44,8 +44,8 @@ sequential decision problem, which is exactly what RL is for.
 - [x] Fatigue-aware bandit baseline (it beats PPO at the current training budget)
 - [x] Longer PPO training with similarity features (ties the bandit, 2 seeds)
 - [ ] More seeds for the follow-up (paused)
-- [ ] Real feedback pipeline
-- [ ] LLM agents (collector, summarizer, reflector)
+- [x] Real feedback pipeline (CLI, file-based; GitHub Issue / Telegram feedback is next)
+- [x] LLM agents (collector, summarizer, reflector), untested against live APIs
 - [ ] GitHub Actions daily run
 
 ## Getting started
@@ -253,6 +253,46 @@ With the right features and more training, PPO goes from 8.4 to roughly the leve
 the tuned fatigue-aware bandit. Only 2 seeds were run, so this is preliminary: it
 shows the earlier gap was largely about features and training budget, not that PPO
 beats the bandit. The research track is paused here to build the live pipeline.
+
+## Live pipeline (multi-agent)
+
+Curio now runs on real content. Three agents cooperate with the trained RL policy:
+
+| Component | Role |
+|---|---|
+| **Collector agent** (`curio.collector`) | Fetches candidates from arXiv, Hacker News and any RSS/Atom feeds. One failing source never stops the run. |
+| **Policy** (`curio.live`, `models/curio_policy.pt`) | The PPO actor-critic trained on the long-horizon simulator picks the daily slate from the shortlist. |
+| **Summarizer agent** (`curio.agents`) | Writes a two-sentence summary per picked item (LLM, with an extractive fallback). |
+| **Reflector agent** (`curio.agents`) | Turns your click history into a readable `profile.md` (LLM, with a keyword fallback). |
+
+```bash
+# Try it offline with bundled synthetic items (no network, no API key):
+python -m curio.cli daily --demo --offline
+python -m curio.cli feedback --clicked 1 3     # item numbers from today's digest
+python -m curio.cli reflect --offline          # writes profile.md
+
+# Real run (needs network; set ANTHROPIC_API_KEY for LLM summaries and profiles):
+pip install anthropic            # optional, for the LLM agents
+python -m curio.cli daily
+```
+
+Items you do not click count as ignored. Optional extras: `anthropic` (LLM agents) and
+`sentence-transformers` (`--embedder sbert`); the default hashing embedder works offline.
+Item text from the internet is treated as untrusted data in all prompts.
+
+**What is and is not verified**
+
+- Verified by tests: parsers on fixture feeds, de-duplication, graceful fallbacks, and
+  that the live observation matches the simulator's observation **exactly**
+  (`tests/test_live.py`), plus an offline end-to-end run of daily, feedback and reflect.
+- **Not yet tested against the live arXiv / Hacker News APIs or the Anthropic API**, which
+  were not reachable from the development sandbox. Expect to fix small issues on first run.
+- The policy was trained on a simulator with 8-dimensional synthetic items. Real text is
+  embedded into 8 dimensions with a hashing embedder, which is crude, and slates are built
+  open loop (no click feedback between items of one digest). In the offline demo some
+  digests contain near-duplicate topics. **There is no evaluation yet of how well the live
+  ranking matches a real person's taste**; that needs real feedback over several weeks.
+- `models/curio_policy.pt` is the seed-0 checkpoint of the PPO run with similarity features.
 
 ## Running the tests
 
